@@ -4,22 +4,22 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { loadSkiAreas } from "./services/skiService";
 
-import MapView from "./components/Map.vue"
+import MapView from "./components/Map.vue";
 
 const greetMsg = ref("");
 const name = ref("");
-const mapRef = ref<InstanceType<typeof MapView>>()
+const mapRef = ref<InstanceType<typeof MapView>>();
 
 async function getSkiAreas() {
-  const pistes = await loadSkiAreas(47.2682, 11.3923, 5000)
-  mapRef.value?.addPisteMarkers(pistes)
+  const pistes = await loadSkiAreas(47.2682, 11.3923, 5000);
+  mapRef.value?.addPisteMarkers(pistes);
 }
 </script>
 
 <template>
   <main class="app-root">
     <div class="map">
-      <MapView ref="mapRef"/>
+      <MapView ref="mapRef" />
     </div>
     <div>
       <button v-on:click="getSkiAreas">Ski Areale abrufen</button>
