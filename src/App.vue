@@ -1,13 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-
+import { ref } from "vue";
+import MapView from "./components/Map.vue";
 import { loadSkiAreas } from "./services/skiService";
 
-import MapView from "./components/Map.vue";
-
-const greetMsg = ref("");
-const name = ref("");
 const mapRef = ref<InstanceType<typeof MapView>>();
 
 async function getSkiAreas() {
@@ -17,155 +12,126 @@ async function getSkiAreas() {
 </script>
 
 <template>
-  <main class="app-root">
-    <div class="map">
-      <MapView ref="mapRef" />
-    </div>
-    <div>
-      <button v-on:click="getSkiAreas">Ski Areale abrufen</button>
-    </div>
-  </main>
+  <div class="app-root">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo-container">
+        <img src="/Logo_APP.png" alt="App Logo" class="logo" />
+        <h1>Ski Explorer</h1>
+      </div>
+      <div class="controls">
+        <button @click="getSkiAreas">Load Ski Areas</button>
+      </div>
+      <footer class="sidebar-footer">
+        <p>© 2026 Ski Explorer</p>
+      </footer>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+      <MapView ref="mapRef" class="map" />
+    </main>
+  </div>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
+/* App root layout */
 .app-root {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
   display: flex;
-}
-
-.map {
-  width: 50vw;
-  height: 100%;
-}
-</style>
-
-<style>
-:root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-color);
 }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
+/* Sidebar */
+.sidebar {
+  width: 300px;
+  background-color: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 2rem 1rem;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+}
+
+.logo-container {
   text-align: center;
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
+  width: 100px;
+  margin-bottom: 1rem;
+  transition: filter 0.5s;
 }
-
-.logo.tauri:hover {
+.logo:hover {
   filter: drop-shadow(0 0 2em #24c8db);
 }
 
-.row {
+.controls {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
 button {
+  padding: 0.8rem 1.2rem;
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  font-size: 1rem;
   font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
   background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
   cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s;
 }
-
 button:hover {
   border-color: #396cd8;
 }
 button:active {
-  border-color: #396cd8;
   background-color: #e8e8e8;
 }
 
-input,
-button {
-  outline: none;
+.sidebar-footer {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #888;
 }
 
-#greet-input {
-  margin-right: 5px;
+/* Main content (map) */
+.main-content {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--main-bg);
+}
+
+.map {
+  width: 95%;
+  height: 95%;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Light/Dark Mode Variables */
+:root {
+  --bg-color: #f6f6f6;
+  --text-color: #0f0f0f;
+  --sidebar-bg: #ffffff;
+  --main-bg: #eaeaea;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+    --bg-color: #2f2f2f;
+    --text-color: #f6f6f6;
+    --sidebar-bg: #1f1f1f;
+    --main-bg: #333;
   }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
-html,
-body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
 }
 </style>
