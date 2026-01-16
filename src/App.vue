@@ -2,12 +2,23 @@
 import { ref } from "vue";
 import MapView from "./components/Map.vue";
 import { loadSkiAreas } from "./services/skiService";
+import { Position } from "./types/position";
+import { Slider } from "@/components/ui/slider";
 
 const mapRef = ref<InstanceType<typeof MapView>>();
+const posRef = ref<Position>({ lat: 52.52437, lon: 13.41053 });
+const sliderRef = ref([5]);
+const errorRef = ref<string | null>(null);
 
-async function getSkiAreas() {
-  const pistes = await loadSkiAreas(47.2682, 11.3923, 5000);
-  mapRef.value?.addPisteMarkers(pistes);
+async function getSkiAreas(pos: Position) {
+  try {
+    const pistes = await loadSkiAreas(pos, sliderRef.value[0] * 1000);
+    mapRef.value?.addPisteMarkers(pistes);
+    errorRef.value = null;
+  } catch (error: unknown) {
+    errorRef.value =
+      error instanceof Error ? error.message : "Unbekannter Fehler";
+  }
 }
 </script>
 
@@ -20,7 +31,17 @@ async function getSkiAreas() {
         <h1>Ski Explorer</h1>
       </div>
       <div class="controls">
-        <button @click="getSkiAreas">Load Ski Areas</button>
+        <button @click="getSkiAreas(posRef)">Load Ski Areas</button>
+        <div>
+          <Slider
+            :value="sliderRef"
+            @update:modelValue="sliderRef = $event"
+            :max="500"
+            :step="5"
+          />
+          <span>{{ sliderRef[0] }}</span>
+          <span v-if="errorRef">{{ errorRef }}</span>
+        </div>
       </div>
       <footer class="sidebar-footer">
         <p>© 2026 Ski Explorer</p>
@@ -29,7 +50,7 @@ async function getSkiAreas() {
 
     <!-- Main content -->
     <main class="main-content">
-      <MapView ref="mapRef" class="map" />
+      <MapView ref="mapRef" class="map" :pos="posRef" />
     </main>
   </div>
 </template>

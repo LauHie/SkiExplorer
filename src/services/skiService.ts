@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Position } from "../types/position";
 
 export interface SkiArea {
   id: number;
@@ -9,22 +10,22 @@ export interface SkiArea {
 }
 
 export async function loadSkiAreas(
-  lat: number,
-  lon: number,
+  position: Position,
   radius = 50000
 ): Promise<SkiArea[]> {
   try {
-    const skiAreas = await invoke<SkiArea[]>("fetch_ski_areas", {
-      lat,
-      lon,
+    return await invoke<SkiArea[]>("fetch_ski_areas", {
+      position,
       radius,
     });
-    return skiAreas;
   } catch (error) {
     console.error("Failed to load ski areas:", error);
-    // Optionally, you can return an empty array instead of throwing
-    return [];
-    // Or rethrow if you want the caller to handle it
-    // throw error
+
+    // Normalize error to Error instance
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("OSM API überlastet weil kacke");
   }
 }

@@ -1,6 +1,12 @@
 use reqwest::Client;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[derive(Deserialize)]
+pub struct Position{
+    pub lat: f64,
+    pub lon: f64,
+}
 
 #[derive(Serialize)]
 pub struct SkiArea {
@@ -13,8 +19,7 @@ pub struct SkiArea {
 
 #[tauri::command]
 pub async fn fetch_ski_areas(
-    lat: f64,
-    lon: f64,
+    position: Position,
     radius: u32,
 ) -> Result<Vec<SkiArea>, String> {
     let query = format!(
@@ -25,8 +30,8 @@ pub async fn fetch_ski_areas(
         );
         out center tags;
         "#,
-        lat = lat,
-        lon = lon,
+        lat = position.lat,
+        lon = position.lon,
         radius = radius
     );
 

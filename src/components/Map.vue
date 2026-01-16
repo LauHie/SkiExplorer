@@ -5,80 +5,80 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from "vue"
-import L from "leaflet"
-import type { SkiArea } from "../services/skiService"
+import { onMounted, onBeforeUnmount } from "vue";
+import L from "leaflet";
+import type { SkiArea } from "../services/skiService";
+import { Position } from "../types/position";
 
-let map: L.Map
-let pisteLayer: L.LayerGroup
-let userLayer: L.LayerGroup
+let map: L.Map;
+let pisteLayer: L.LayerGroup;
+let userLayer: L.LayerGroup;
 
-function initMap() {
-  map = L.map("map").setView([47.2682, 11.3923], 9)
+function initMap(pos: Position) {
+  map = L.map("map").setView([pos.lat, pos.lon], 9);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap contributors",
-  }).addTo(map)
+  }).addTo(map);
 
-  pisteLayer = L.layerGroup().addTo(map)
-  userLayer = L.layerGroup().addTo(map)
+  pisteLayer = L.layerGroup().addTo(map);
+  userLayer = L.layerGroup().addTo(map);
 }
 
-function addUserMarker(lat: number, lon: number) {
-  userLayer.clearLayers()
-  L.marker([lat, lon])
-    .addTo(userLayer)
-    .bindPopup("Dein Standort")
+function addUserMarker(pos: Position) {
+  userLayer.clearLayers();
+  L.marker([pos.lat, pos.lon]).addTo(userLayer).bindPopup("Dein Standort");
 }
 
 function addPisteMarkers(pistes: SkiArea[]) {
-  pisteLayer.clearLayers()
+  pisteLayer.clearLayers();
 
   pistes.forEach((piste) => {
     L.circleMarker([piste.lat, piste.lon], {
       radius: 6,
       color: getDifficultyColor(piste.difficulty),
       fillOpacity: 0.8,
-    })
-      .addTo(pisteLayer)
-      .bindPopup(`
+    }).addTo(pisteLayer).bindPopup(`
         <b>${piste.name}</b><br/>
         Schwierigkeit: ${piste.difficulty ?? "unbekannt"}
-      `)
-  })
+      `);
+  });
 }
 
 function clearPisteMarkers() {
-  pisteLayer.clearLayers()
+  pisteLayer.clearLayers();
 }
 
 function getDifficultyColor(diff?: string) {
   switch (diff) {
     case "blue":
-      return "blue"
+      return "blue";
     case "red":
-      return "red"
+      return "red";
     case "black":
-      return "black"
+      return "black";
     default:
-      return "gray"
+      return "gray";
   }
 }
+const props = defineProps<{
+  pos: Position;
+}>();
 
 defineExpose({
   addUserMarker,
   addPisteMarkers,
   clearPisteMarkers,
-})
+});
 
 onMounted(() => {
-  initMap()
-  addUserMarker(47.2682, 11.3923)
-})
+  initMap(props.pos);
+  addUserMarker(props.pos);
+});
 
 onBeforeUnmount(() => {
-  map.remove()
-})
+  map.remove();
+});
 </script>
 
 <style scoped>
