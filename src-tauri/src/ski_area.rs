@@ -14,6 +14,7 @@ pub struct SkiArea {
     pub name: String,
     pub lat: f64,
     pub lon: f64,
+    pub difficulty: String,
     pub operator: Option<String>,
 }
 
@@ -23,17 +24,18 @@ pub async fn fetch_ski_areas(
     radius: u32,
 ) -> Result<Vec<SkiArea>, String> {
     let query = format!(
-        r#"
-        [out:json][timeout:25];
-        (
-          way(around:{radius},{lat},{lon})["piste:type"="downhill"];
-        );
-        out center tags;
-        "#,
-        lat = position.lat,
-        lon = position.lon,
-        radius = radius
+    r#"
+    [out:json][timeout:25];
+    (
+      way(around:{radius},{lat},{lon})
+        ["piste:type"="downhill"];
     );
+    out center tags;
+    "#,
+    lat = position.lat,
+    lon = position.lon,
+    radius = radius
+);
 
     let client = Client::new();
     let mut last_err = None;
@@ -80,6 +82,8 @@ pub async fn fetch_ski_areas(
                         continue;
                     }
                 };
+                
+                println!("{}",json);
 
                 // Build SkiArea list
                 let mut ski_areas = Vec::new();
@@ -103,12 +107,19 @@ pub async fn fetch_ski_areas(
                             .and_then(|v| v.as_f64())
                             .or_else(|| el.get("center").and_then(|c| c.get("lon")).and_then(|v| v.as_f64()));
 
+                        let difficulty = tags
+                            .get("piste:difficulty")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unbekannt")
+                            .to_string();
+
                         if let (Some(lat), Some(lon)) = (lat, lon) {
                             ski_areas.push(SkiArea {
                                 id: el.get("id").and_then(|v| v.as_i64()).unwrap_or(0),
                                 name,
                                 lat,
                                 lon,
+                                difficulty,
                                 operator: tags.get("operator").and_then(|v| v.as_str()).map(String::from),
                             });
                         }

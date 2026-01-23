@@ -4,18 +4,32 @@ import MapView from "./components/Map.vue";
 import { loadSkiAreas } from "./services/skiService";
 import { Position } from "./types/position";
 import { Slider } from "@/components/ui/slider";
+import { useTauriDesktopGuards } from "./composables/useTauriDesktopGuards";
+import { Spinner } from "@/components/ui/spinner";
+
+useTauriDesktopGuards({
+  blockFileDrop: true,
+  blockContextMenu: true,
+  blockContextMenuInDev: false,
+});
 
 const mapRef = ref<InstanceType<typeof MapView>>();
 const posRef = ref<Position>({ lat: 52.52437, lon: 13.41053 });
-const sliderRef = ref([5]);
+const sliderRef = ref<number[] | undefined>([5]);
 const errorRef = ref<string | null>(null);
+const waitingForApi = ref(false);
 
 async function getSkiAreas(pos: Position) {
   try {
-    const pistes = await loadSkiAreas(pos, sliderRef.value[0] * 1000);
-    mapRef.value?.addPisteMarkers(pistes);
-    errorRef.value = null;
+    if (sliderRef.value) {
+      waitingForApi.value = true;
+      const pistes = await loadSkiAreas(pos, sliderRef.value[0] * 1000);
+      waitingForApi.value = false;
+      mapRef.value?.addPisteMarkers(pistes);
+      errorRef.value = null;
+    }
   } catch (error: unknown) {
+    waitingForApi.value = false;
     errorRef.value =
       error instanceof Error ? error.message : "Unbekannter Fehler";
   }
@@ -26,23 +40,41 @@ async function getSkiAreas(pos: Position) {
   <div class="app-root">
     <!-- Sidebar -->
     <aside class="sidebar">
-      <div class="logo-container">
-        <img src="/Logo_APP.png" alt="App Logo" class="logo" />
-        <h1>Ski Explorer</h1>
-      </div>
-      <div class="controls">
-        <button @click="getSkiAreas(posRef)">Load Ski Areas</button>
-        <div>
-          <Slider
-            :value="sliderRef"
-            @update:modelValue="sliderRef = $event"
-            :max="500"
-            :step="5"
-          />
-          <span>{{ sliderRef[0] }}</span>
-          <span v-if="errorRef">{{ errorRef }}</span>
+      <div class="sidebar-content">
+        <div class="logo-section">
+          <img src="/Logo_APP.png" alt="App Logo" class="logo" />
+          <h1 class="app-title">Ski Explorer</h1>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <label class="control-label">Search Radius</label>
+            <Slider
+              :value="sliderRef"
+              @update:modelValue="sliderRef = $event"
+              :max="500"
+              :step="5"
+            />
+            <div class="slider-value">
+              <span v-if="sliderRef">{{ sliderRef[0] }} km</span>
+            </div>
+          </div>
+
+          <button
+            @click="getSkiAreas(posRef)"
+            class="load-button"
+            :disabled="waitingForApi"
+          >
+            <Spinner v-if="waitingForApi" />
+            <span v-else>Load Ski Areas</span>
+          </button>
+
+          <div v-if="errorRef" class="error-message">
+            {{ errorRef }}
+          </div>
         </div>
       </div>
+
       <footer class="sidebar-footer">
         <p>© 2026 Ski Explorer</p>
       </footer>
@@ -56,13 +88,12 @@ async function getSkiAreas(pos: Position) {
 </template>
 
 <style scoped>
-/* App root layout */
 .app-root {
   display: flex;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
 }
@@ -74,85 +105,125 @@ async function getSkiAreas(pos: Position) {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 2rem 1rem;
-  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 8px var(--shadow-color);
+  border-right: 1px solid var(--border-color);
 }
 
-.logo-container {
+.sidebar-content {
+  padding: 2rem 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.logo-section {
   text-align: center;
 }
 
 .logo {
   width: 100px;
+  height: 100px;
+  object-fit: contain;
   margin-bottom: 1rem;
-  transition: filter 0.5s;
+  margin-left: auto;
+  margin-right: auto;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
+
+.app-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--title-color);
 }
 
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-top: 2rem;
+  gap: 1.5rem;
 }
 
-button {
-  padding: 0.8rem 1.2rem;
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.control-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--label-color);
+}
+
+.slider-value {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--label-color);
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.load-button {
+  padding: 0.875rem 1.25rem;
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: none;
   font-size: 1rem;
   font-weight: 500;
-  background-color: #ffffff;
+  background-color: var(--button-bg);
+  color: var(--button-text);
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
 }
-button:hover {
-  border-color: #396cd8;
+
+.load-button:hover:not(:disabled) {
+  background-color: var(--button-hover);
 }
-button:active {
-  background-color: #e8e8e8;
+
+.load-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  padding: 0.75rem;
+  background-color: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  color: var(--error-text);
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .sidebar-footer {
+  padding: 1.5rem;
   text-align: center;
-  font-size: 0.85rem;
-  color: #888;
+  border-top: 1px solid var(--border-color);
 }
 
-/* Main content (map) */
+.sidebar-footer p {
+  margin: 0;
+  font-size: 0.813rem;
+  color: var(--footer-color);
+}
+
+/* Main content */
 .main-content {
   flex: 1;
   height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  padding: 1rem;
   background-color: var(--main-bg);
 }
 
 .map {
-  width: 95%;
-  height: 95%;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-/* Light/Dark Mode Variables */
-:root {
-  --bg-color: #f6f6f6;
-  --text-color: #0f0f0f;
-  --sidebar-bg: #ffffff;
-  --main-bg: #eaeaea;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: #2f2f2f;
-    --text-color: #f6f6f6;
-    --sidebar-bg: #1f1f1f;
-    --main-bg: #333;
-  }
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px var(--shadow-color);
 }
 </style>

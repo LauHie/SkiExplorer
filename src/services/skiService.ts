@@ -6,6 +6,7 @@ export interface SkiArea {
   name: string;
   lat: number;
   lon: number;
+  difficulty: string;
   operator?: string;
 }
 
@@ -26,6 +27,6 @@ export async function loadSkiAreas(
       throw error;
     }
 
-    throw new Error("OSM API überlastet weil kacke");
+    throw new Error("OSM API überlastet");
   }
 }
