@@ -30,7 +30,6 @@ const sliderRef = ref<number[] | undefined>([5]);
 const errorRef = ref<string | null>(null);
 const waitingForApi = ref(false);
 const searchRef = ref<string>("");
-const isOpen = ref(false);
 
 async function getSkiAreas(pos: Position) {
   try {
