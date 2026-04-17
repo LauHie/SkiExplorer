@@ -6,6 +6,17 @@ import { Position } from "./types/position";
 import { Slider } from "@/components/ui/slider";
 import { useTauriDesktopGuards } from "./composables/useTauriDesktopGuards";
 import { Spinner } from "@/components/ui/spinner";
+import { loadStandort, Standort } from "./services/standortService";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 useTauriDesktopGuards({
   blockFileDrop: true,
@@ -18,6 +29,8 @@ const posRef = ref<Position>({ lat: 52.52437, lon: 13.41053 });
 const sliderRef = ref<number[] | undefined>([5]);
 const errorRef = ref<string | null>(null);
 const waitingForApi = ref(false);
+const searchRef = ref<string>("");
+const isOpen = ref(false);
 
 async function getSkiAreas(pos: Position) {
   try {
@@ -34,16 +47,46 @@ async function getSkiAreas(pos: Position) {
       error instanceof Error ? error.message : "Unbekannter Fehler";
   }
 }
+
+async function getStandort() {
+  try {
+    if (searchRef.value && searchRef.value.length >= 0) {
+      const standorte = await loadStandort(searchRef.value);
+      mapRef.value?.setView(posRef.value);
+    } else {
+      let err = Error("Fehlende Eingabe");
+      console.error(err);
+      throw err;
+    }
+  } catch (error: unknown) {
+    errorRef.value =
+      error instanceof Error ? error.message : "Fehlende Eingabe";
+  }
+}
 </script>
 
 <template>
   <div class="app-root">
+    <div class="data">Laurenz</div>
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-content">
         <div class="logo-section">
           <img src="/Logo_APP.png" alt="App Logo" class="logo" />
           <h1 class="app-title">Ski Explorer</h1>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label">Standort Eingabe</label>
+          <input
+            v-model="searchRef"
+            type="text"
+            placeholder="z.B. Berlin"
+            class="text-input"
+          />
+          <button @click="getStandort" class="go-button">
+            <span>GO</span>
+          </button>
         </div>
 
         <div class="controls">
@@ -89,11 +132,13 @@ async function getSkiAreas(pos: Position) {
 
 <style scoped>
 .app-root {
+  position: relative;
   display: flex;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
 }
@@ -163,6 +208,23 @@ async function getSkiAreas(pos: Position) {
   margin-top: 0.5rem;
 }
 
+.go-button {
+  padding: 0.875rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+
 .load-button {
   padding: 0.875rem 1.25rem;
   border-radius: 8px;
@@ -225,5 +287,33 @@ async function getSkiAreas(pos: Position) {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.text-input {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  width: 100%;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+}
+
+.data {
+  position: absolute;
+  right: 50px;
+  left: auto;
+  z-index: 500;
+}
+.leaflet-container {
+  z-index: 0;
+}
+
+.sidebar {
+  z-index: 10;
+}
+
+.sheet-content {
+  z-index: 9999;
 }
 </style>

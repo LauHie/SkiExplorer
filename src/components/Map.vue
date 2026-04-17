@@ -25,6 +25,13 @@ function initMap(pos: Position) {
   userLayer = L.layerGroup().addTo(map);
 }
 
+function setView(pos: Position) {
+  if (pos.lat >= 0 && pos.lon >= 0) {
+    map.setView([pos.lat, pos.lon], 9);
+    addUserMarker(pos);
+  }
+}
+
 function addUserMarker(pos: Position) {
   userLayer.clearLayers();
   L.marker([pos.lat, pos.lon]).addTo(userLayer).bindPopup("Dein Standort");
@@ -69,6 +76,7 @@ defineExpose({
   addUserMarker,
   addPisteMarkers,
   clearPisteMarkers,
+  setView,
 });
 
 onMounted(() => {
@@ -85,6 +93,7 @@ onBeforeUnmount(() => {
 .map-container {
   width: 100%;
   height: 100%;
+  z-index: 1 !important;
 }
 
 #map {

@@ -1,14 +1,9 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::types::Position;
 
-#[derive(Deserialize)]
-pub struct Position{
-    pub lat: f64,
-    pub lon: f64,
-}
-
-#[derive(Serialize)]
+#[derive(Serialize)] //Serialize um an Front-End zu senden
 pub struct SkiArea {
     pub id: i64,
     pub name: String,
@@ -18,7 +13,7 @@ pub struct SkiArea {
     pub operator: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command] //Makro macht die Funktion nutzbar im Front-End
 pub async fn fetch_ski_areas(
     position: Position,
     radius: u32,
@@ -83,7 +78,7 @@ pub async fn fetch_ski_areas(
                     }
                 };
                 
-                println!("{}",json);
+                //println!("{}", serde_json::to_string_pretty(&json).unwrap());
 
                 // Build SkiArea list
                 let mut ski_areas = Vec::new();
