@@ -6,6 +6,7 @@ export interface Standort {
   name: string;
   pos: Position;
   class: String;
+  boundary?: [number, number, number, number];
 }
 
 export async function loadStandort(queryString: String): Promise<Standort[]> {

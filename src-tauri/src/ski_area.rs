@@ -1,7 +1,7 @@
+use crate::types::Position;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::types::Position;
 
 #[derive(Serialize)] //Serialize um an Front-End zu senden
 pub struct SkiArea {
@@ -14,12 +14,9 @@ pub struct SkiArea {
 }
 
 #[tauri::command] //Makro macht die Funktion nutzbar im Front-End
-pub async fn fetch_ski_areas(
-    position: Position,
-    radius: u32,
-) -> Result<Vec<SkiArea>, String> {
+pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
     let query = format!(
-    r#"
+        r#"
     [out:json][timeout:25];
     (
       way(around:{radius},{lat},{lon})
@@ -27,10 +24,10 @@ pub async fn fetch_ski_areas(
     );
     out center tags;
     "#,
-    lat = position.lat,
-    lon = position.lon,
-    radius = radius
-);
+        lat = position.lat,
+        lon = position.lon,
+        radius = radius
+    );
 
     let client = Client::new();
     let mut last_err = None;
@@ -77,8 +74,8 @@ pub async fn fetch_ski_areas(
                         continue;
                     }
                 };
-                
-                //println!("{}", serde_json::to_string_pretty(&json).unwrap());
+
+                println!("{}", serde_json::to_string_pretty(&json).unwrap());
 
                 // Build SkiArea list
                 let mut ski_areas = Vec::new();
@@ -92,15 +89,17 @@ pub async fn fetch_ski_areas(
                             .unwrap_or("Unbenanntes Skigebiet")
                             .to_string();
 
-                        let lat = el
-                            .get("lat")
-                            .and_then(|v| v.as_f64())
-                            .or_else(|| el.get("center").and_then(|c| c.get("lat")).and_then(|v| v.as_f64()));
+                        let lat = el.get("lat").and_then(|v| v.as_f64()).or_else(|| {
+                            el.get("center")
+                                .and_then(|c| c.get("lat"))
+                                .and_then(|v| v.as_f64())
+                        });
 
-                        let lon = el
-                            .get("lon")
-                            .and_then(|v| v.as_f64())
-                            .or_else(|| el.get("center").and_then(|c| c.get("lon")).and_then(|v| v.as_f64()));
+                        let lon = el.get("lon").and_then(|v| v.as_f64()).or_else(|| {
+                            el.get("center")
+                                .and_then(|c| c.get("lon"))
+                                .and_then(|v| v.as_f64())
+                        });
 
                         let difficulty = tags
                             .get("piste:difficulty")
@@ -115,7 +114,10 @@ pub async fn fetch_ski_areas(
                                 lat,
                                 lon,
                                 difficulty,
-                                operator: tags.get("operator").and_then(|v| v.as_str()).map(String::from),
+                                operator: tags
+                                    .get("operator")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from),
                             });
                         }
                     }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import MapView from "./components/Map.vue";
 import { loadSkiAreas } from "./services/skiService";
 import { Position } from "./types/position";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import { useTauriDesktopGuards } from "./composables/useTauriDesktopGuards";
 import { Spinner } from "@/components/ui/spinner";
 import { loadStandort, Standort } from "./services/standortService";
@@ -15,8 +16,16 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Mountain,
+  MapPin,
+  Search,
+  List,
+  AlertCircle,
+  ChevronRight,
+  Ruler,
+} from "lucide-vue-next";
 
 useTauriDesktopGuards({
   blockFileDrop: true,
@@ -29,7 +38,14 @@ const posRef = ref<Position>({ lat: 52.52437, lon: 13.41053 });
 const sliderRef = ref<number[] | undefined>([5]);
 const errorRef = ref<string | null>(null);
 const waitingForApi = ref(false);
+const searchingRef = ref(false);
 const searchRef = ref<string>("");
+const isOpen = ref(false);
+const standorteRef = ref<Standort[]>([]);
+const selectedStandort = ref<Standort | null>(null);
+const lastQueryRef = ref<string>("");
+
+const hasResults = computed(() => standorteRef.value.length > 0);
 
 async function getSkiAreas(pos: Position) {
   try {
@@ -48,271 +64,281 @@ async function getSkiAreas(pos: Position) {
 }
 
 async function getStandort() {
-  try {
-    if (searchRef.value && searchRef.value.length >= 0) {
-      const standorte = await loadStandort(searchRef.value);
-      mapRef.value?.setView(posRef.value);
-    } else {
-      let err = Error("Fehlende Eingabe");
-      console.error(err);
-      throw err;
-    }
-  } catch (error: unknown) {
-    errorRef.value =
-      error instanceof Error ? error.message : "Fehlende Eingabe";
+  const query = searchRef.value.trim();
+  if (!query) {
+    errorRef.value = "Fehlende Eingabe";
+    return;
   }
+  try {
+    searchingRef.value = true;
+    standorteRef.value = await loadStandort(query);
+    lastQueryRef.value = query;
+    selectedStandort.value = null;
+    errorRef.value = null;
+    mapRef.value?.showStandorte(standorteRef.value);
+    mapRef.value?.clearBoundary();
+    isOpen.value = true;
+  } catch (error: unknown) {
+    standorteRef.value = [];
+    errorRef.value =
+      error instanceof Error ? error.message : "Suche fehlgeschlagen";
+  } finally {
+    searchingRef.value = false;
+  }
+}
+
+function selectStandort(standort: Standort) {
+  selectedStandort.value = standort;
+  posRef.value = standort.pos;
+  mapRef.value?.setView(standort.pos);
+  mapRef.value?.setBoundary(standort.boundary);
+  mapRef.value?.showStandorte(standorteRef.value, standort.id);
+}
+
+function openResults() {
+  if (hasResults.value) isOpen.value = true;
+}
+
+function clearResults() {
+  standorteRef.value = [];
+  selectedStandort.value = null;
+  lastQueryRef.value = "";
+  mapRef.value?.clearStandorte();
+  mapRef.value?.clearBoundary();
+  isOpen.value = false;
 }
 </script>
 
 <template>
-  <div class="app-root">
-    <div class="data">Laurenz</div>
+  <div
+    class="relative flex h-screen w-screen overflow-hidden bg-background font-sans text-foreground antialiased"
+  >
     <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-content">
-        <div class="logo-section">
-          <img src="/Logo_APP.png" alt="App Logo" class="logo" />
-          <h1 class="app-title">Ski Explorer</h1>
+    <aside
+      class="z-10 flex w-[320px] shrink-0 flex-col justify-between border-r border-border bg-sidebar shadow-xl"
+    >
+      <div class="flex flex-1 flex-col gap-7 overflow-y-auto px-6 py-7">
+        <!-- Logo / Brand -->
+        <div class="flex items-center gap-3">
+          <div
+            class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"
+          >
+            <Mountain class="size-6" />
+          </div>
+          <div class="flex flex-col">
+            <h1 class="text-lg font-semibold leading-tight tracking-tight">
+              Ski Explorer
+            </h1>
+            <p class="text-xs text-muted-foreground">
+              Finde Pisten in deiner Nähe
+            </p>
+          </div>
         </div>
 
-        <div class="control-group">
-          <label class="control-label">Standort Eingabe</label>
-          <input
-            v-model="searchRef"
-            type="text"
-            placeholder="z.B. Berlin"
-            class="text-input"
-          />
-          <button @click="getStandort" class="go-button">
-            <span>GO</span>
-          </button>
-        </div>
+        <!-- Search section -->
+        <section class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <Search class="size-4 text-muted-foreground" />
+            <label
+              for="search-input"
+              class="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            >
+              Standort suchen
+            </label>
+          </div>
 
-        <div class="controls">
-          <div class="control-group">
-            <label class="control-label">Search Radius</label>
+          <div class="relative">
+            <input
+              id="search-input"
+              v-model="searchRef"
+              type="text"
+              placeholder="z.B. Berlin, Innsbruck …"
+              class="w-full rounded-md border border-border bg-background px-3 py-2 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              @keydown.enter="getStandort"
+            />
+            <MapPin
+              class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+
+          <Button class="w-full" :disabled="searchingRef" @click="getStandort">
+            <Spinner v-if="searchingRef" />
+            <template v-else>
+              <Search class="size-4" />
+              <span>Suchen</span>
+            </template>
+          </Button>
+
+          <Button
+            v-if="hasResults"
+            variant="outline"
+            class="w-full justify-between"
+            @click="openResults"
+          >
+            <span class="flex items-center gap-2">
+              <List class="size-4" />
+              Ergebnisse ({{ standorteRef.length }})
+            </span>
+            <ChevronRight class="size-4" />
+          </Button>
+        </section>
+
+        <div class="h-px w-full bg-border" />
+
+        <!-- Radius / Pisten section -->
+        <section class="flex flex-col gap-4">
+          <div class="flex items-center gap-2">
+            <Ruler class="size-4 text-muted-foreground" />
+            <label
+              class="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            >
+              Suchradius
+            </label>
+          </div>
+
+          <div class="flex flex-col gap-2">
             <Slider
               :value="sliderRef"
               @update:modelValue="sliderRef = $event"
               :max="500"
               :step="5"
             />
-            <div class="slider-value">
-              <span v-if="sliderRef">{{ sliderRef[0] }} km</span>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-muted-foreground">0 km</span>
+              <span
+                class="rounded-md bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground tabular-nums"
+              >
+                {{ sliderRef?.[0] ?? 0 }} km
+              </span>
+              <span class="text-muted-foreground">500 km</span>
             </div>
           </div>
 
-          <button
-            @click="getSkiAreas(posRef)"
-            class="load-button"
+          <Button
+            variant="default"
+            class="w-full"
             :disabled="waitingForApi"
+            @click="getSkiAreas(posRef)"
           >
             <Spinner v-if="waitingForApi" />
-            <span v-else>Load Ski Areas</span>
-          </button>
+            <template v-else>
+              <Mountain class="size-4" />
+              <span>Pisten laden</span>
+            </template>
+          </Button>
+        </section>
 
-          <div v-if="errorRef" class="error-message">
-            {{ errorRef }}
+        <!-- Error message -->
+        <div
+          v-if="errorRef"
+          class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          <AlertCircle class="mt-0.5 size-4 shrink-0" />
+          <span class="leading-snug">{{ errorRef }}</span>
+        </div>
+
+        <!-- Selected standort card -->
+        <div
+          v-if="selectedStandort"
+          class="mt-auto rounded-lg border border-border bg-card p-3 shadow-sm"
+        >
+          <div class="flex items-start gap-2">
+            <MapPin class="mt-0.5 size-4 shrink-0 text-primary" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-semibold text-card-foreground">
+                {{ selectedStandort.name }}
+              </p>
+              <p class="truncate text-xs text-muted-foreground">
+                {{ selectedStandort.class }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <footer class="sidebar-footer">
-        <p>© 2026 Ski Explorer</p>
+      <footer class="border-t border-border px-6 py-4 text-center">
+        <p class="text-xs text-muted-foreground">© 2026 Ski Explorer</p>
       </footer>
     </aside>
 
     <!-- Main content -->
-    <main class="main-content">
-      <MapView ref="mapRef" class="map" :pos="posRef" />
+    <main class="relative h-full flex-1 bg-muted/30 p-4">
+      <MapView
+        ref="mapRef"
+        class="h-full w-full overflow-hidden rounded-xl border border-border shadow-lg"
+        :pos="posRef"
+      />
     </main>
+
+    <!-- Search results sheet -->
+    <Sheet v-model:open="isOpen">
+      <SheetContent side="right" class="sm:max-w-md">
+        <SheetHeader class="gap-1">
+          <SheetTitle class="flex items-center gap-2 text-lg">
+            <List class="size-5" />
+            Suchergebnisse
+          </SheetTitle>
+          <SheetDescription>
+            <span v-if="hasResults">
+              {{ standorteRef.length }} Treffer für
+              <span class="font-medium text-foreground">
+                „{{ lastQueryRef }}"
+              </span>
+            </span>
+            <span v-else>Keine Ergebnisse.</span>
+          </SheetDescription>
+        </SheetHeader>
+
+        <div class="flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-2">
+          <button
+            v-for="(standort, i) in standorteRef"
+            :key="standort.id"
+            type="button"
+            @click="selectStandort(standort)"
+            :class="[
+              'group flex items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+              selectedStandort?.id === standort.id
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                : 'border-border hover:border-primary/40 hover:bg-accent',
+            ]"
+          >
+            <span
+              :class="[
+                'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm',
+                selectedStandort?.id === standort.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground group-hover:bg-primary group-hover:text-primary-foreground',
+              ]"
+            >
+              {{ i + 1 }}
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-medium leading-snug">
+                {{ standort.name }}
+              </p>
+              <p class="truncate text-xs text-muted-foreground">
+                {{ standort.class }}
+              </p>
+              <p class="mt-1 text-[11px] tabular-nums text-muted-foreground/80">
+                {{ standort.pos.lat.toFixed(4) }},
+                {{ standort.pos.lon.toFixed(4) }}
+              </p>
+            </div>
+            <ChevronRight
+              class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+            />
+          </button>
+        </div>
+
+        <SheetFooter class="border-t border-border pt-4">
+          <Button variant="ghost" class="w-full" @click="clearResults">
+            Ergebnisse löschen
+          </Button>
+          <SheetClose as-child>
+            <Button variant="outline" class="w-full">Schließen</Button>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
-
-<style scoped>
-.app-root {
-  position: relative;
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-}
-
-/* Sidebar */
-.sidebar {
-  width: 300px;
-  background-color: var(--sidebar-bg);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 2px 0 8px var(--shadow-color);
-  border-right: 1px solid var(--border-color);
-}
-
-.sidebar-content {
-  padding: 2rem 1.5rem;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.logo-section {
-  text-align: center;
-}
-
-.logo {
-  width: 100px;
-  height: 100px;
-  object-fit: contain;
-  margin-bottom: 1rem;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.app-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--title-color);
-}
-
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.control-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--label-color);
-}
-
-.slider-value {
-  text-align: center;
-  font-size: 0.875rem;
-  color: var(--label-color);
-  font-weight: 500;
-  margin-top: 0.5rem;
-}
-
-.go-button {
-  padding: 0.875rem 1.25rem;
-  border-radius: 8px;
-  border: none;
-  font-size: 1rem;
-  font-weight: 500;
-  background-color: var(--button-bg);
-  color: var(--button-text);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 44px;
-}
-
-.load-button {
-  padding: 0.875rem 1.25rem;
-  border-radius: 8px;
-  border: none;
-  font-size: 1rem;
-  font-weight: 500;
-  background-color: var(--button-bg);
-  color: var(--button-text);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 44px;
-}
-
-.load-button:hover:not(:disabled) {
-  background-color: var(--button-hover);
-}
-
-.load-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error-message {
-  padding: 0.75rem;
-  background-color: var(--error-bg);
-  border: 1px solid var(--error-border);
-  border-radius: 6px;
-  color: var(--error-text);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
-.sidebar-footer {
-  padding: 1.5rem;
-  text-align: center;
-  border-top: 1px solid var(--border-color);
-}
-
-.sidebar-footer p {
-  margin: 0;
-  font-size: 0.813rem;
-  color: var(--footer-color);
-}
-
-/* Main content */
-.main-content {
-  flex: 1;
-  height: 100%;
-  padding: 1rem;
-  background-color: var(--main-bg);
-}
-
-.map {
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px var(--shadow-color);
-}
-
-.text-input {
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  font-size: 0.9rem;
-  width: 100%;
-  background-color: var(--input-bg);
-  color: var(--text-color);
-}
-
-.data {
-  position: absolute;
-  right: 50px;
-  left: auto;
-  z-index: 500;
-}
-.leaflet-container {
-  z-index: 0;
-}
-
-.sidebar {
-  z-index: 10;
-}
-
-.sheet-content {
-  z-index: 9999;
-}
-</style>

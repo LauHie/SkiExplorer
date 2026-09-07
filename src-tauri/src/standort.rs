@@ -1,4 +1,4 @@
-use std::ptr::null;
+use std::{array, ptr::null};
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,7 @@ pub struct Standort {
     pub name: String,
     pub pos: Position,
     pub class: String,
+    pub boundary: Option<Vec<f64>>,
 }
 
 #[tauri::command]
@@ -74,12 +75,23 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
                 .unwrap_or("Unbekannt")
                 .to_string();
 
+            let boundary = el
+                .get("boundingbox")
+                .and_then(|v| v.as_str())
+                .and_then(|s| {
+                    s.split(',')
+                        .map(|x| x.parse::<f64>())
+                        .collect::<Result<Vec<_>, _>>()
+                        .ok()
+                });
+
             if let (Some(lat), Some(lon)) = (lat, lon) {
                 results.push(Standort {
                     id, // Nominatim hat keine ID → optional ersetzen
                     name,
                     pos: Position { lat, lon },
                     class,
+                    boundary,
                 });
             }
         }

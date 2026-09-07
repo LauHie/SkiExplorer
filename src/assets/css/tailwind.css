@@ -117,4 +117,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  .leaflet-container {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+  }
 }
