@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { invoke } from "@tauri-apps/api/core";
 import { ref, computed } from "vue";
 import MapView from "./components/Map.vue";
 import { loadSkiAreas } from "./services/skiService";
@@ -107,6 +108,23 @@ function clearResults() {
   mapRef.value?.clearBoundary();
   isOpen.value = false;
 }
+
+// In App.vue, im <script setup>-Bereich
+const testOverpassApi = async () => {
+  try {
+    console.log("🧪 Starte Overpass API Test...");
+    const result = await invoke<string>("test_overpass_api");
+    console.log("✅ Overpass API Test erfolgreich:", result);
+    errorRef.value = null;
+    // Optional: Zeige das Ergebnis in der UI an
+    alert(
+      "Overpass API funktioniert! Antwort: " + result.substring(0, 100) + "...",
+    );
+  } catch (error) {
+    console.error("❌ Overpass API Test fehlgeschlagen:", error);
+    errorRef.value = `Overpass API Test fehlgeschlagen: ${error}`;
+  }
+};
 </script>
 
 <template>
@@ -225,6 +243,10 @@ function clearResults() {
               <Mountain class="size-4" />
               <span>Pisten laden</span>
             </template>
+          </Button>
+
+          <Button variant="outline" class="w-full" @click="testOverpassApi">
+            <span>Overpass API Test</span>
           </Button>
         </section>
 
