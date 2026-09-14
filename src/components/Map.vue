@@ -198,14 +198,38 @@ function clearStandorte() {
 function drawRoute(coords: number[][]) {
   routeLayer.clearLayers();
 
-  const polyline = L.polyline(coords as L.LatLngExpression[], {
-    color: "#ff69b4", // Pink
-    weight: 3, // dünn
-    opacity: 0.9,
+  // 1. Weiße "Umrandung" (Casing) – hebt die Linie vom Kartenhintergrund ab
+  L.polyline(coords as L.LatLngExpression[], {
+    color: "#ffffff",
+    weight: 8, // breiter als die Route
+    opacity: 0.85,
+    lineCap: "round", // runde Enden
+    lineJoin: "round", // runde Kurven
   }).addTo(routeLayer);
 
+  // 2. Pinke Route darüber
+  const polyline = L.polyline(coords as L.LatLngExpression[], {
+    color: "#ec4899",
+    weight: 4,
+    opacity: 0.95,
+    lineCap: "round",
+    lineJoin: "round",
+    className: "route-line", // Animation
+  }).addTo(routeLayer);
+
+  const last = coords[coords.length - 1];
+  if (last) {
+    L.circleMarker(last as L.LatLngExpression, {
+      radius: 6,
+      color: "#ffffff",
+      fillColor: "#ec4899",
+      fillOpacity: 1,
+      weight: 2,
+    }).addTo(routeLayer);
+  }
+
   try {
-    map.fitBounds(polyline.getBounds(), { padding: [50, 50] }); // optional: auf Route zoomen
+    map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
   } catch {
     // ignore invalid geometry
   }
@@ -283,3 +307,18 @@ onBeforeUnmount(() => {
   delete (window as any).__requestRoute;
 });
 </script>
+
+<style>
+.route-line {
+  stroke-dasharray: 12 12;
+  animation: route-dash 1.2s linear infinite;
+}
+@keyframes route-dash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+</style>
