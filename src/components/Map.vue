@@ -10,13 +10,14 @@ import L from "leaflet";
 import type { SkiArea } from "../services/skiService";
 import type { Standort } from "../services/standortService";
 import { Position } from "../types/position";
-import { invoke } from "@tauri-apps/api/core"; // ✅ Wichtig
+import { invoke } from "@tauri-apps/api/core";
 
 let map: L.Map;
 let pisteLayer: L.LayerGroup;
 let userLayer: L.LayerGroup;
 let standorteLayer: L.LayerGroup;
-let boundaryLayer: L.LayerGroup;
+let routeLayer: L.LayerGroup;
+let currentPos: Position | null = null; // merkt sich den gewählten Standort
 
 function initMap(pos: Position) {
   map = L.map("map").setView([pos.lat, pos.lon], 9);
@@ -25,15 +26,17 @@ function initMap(pos: Position) {
     attribution: "© OpenStreetMap contributors",
   }).addTo(map);
 
-  boundaryLayer = L.layerGroup().addTo(map);
   pisteLayer = L.layerGroup().addTo(map);
   standorteLayer = L.layerGroup().addTo(map);
   userLayer = L.layerGroup().addTo(map);
+  routeLayer = L.layerGroup().addTo(map);
+  currentPos = pos;
 }
 
 function setView(pos: Position, zoom: number = 11) {
   if (!Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return;
   if (Math.abs(pos.lat) > 90 || Math.abs(pos.lon) > 180) return;
+  currentPos = pos;
   map.setView([pos.lat, pos.lon], zoom);
   addUserMarker(pos);
 }
@@ -114,9 +117,9 @@ function buildPopupHtml(piste: SkiArea, color: string, difficultyText: string) {
         "
         onmouseover="this.style.background='linear-gradient(135deg, #1d4ed8, #1e40af)'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(37, 99, 235, 0.4)'"
         onmouseout="this.style.background='linear-gradient(135deg, #2563eb, #1d4ed8)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(37, 99, 235, 0.3)'"
-        onclick="window.__tauriInvoke('log_piste_coordinates', { lat: ${piste.lat}, lon: ${piste.lon}, name: '${piste.name.replace(/'/g, "\\'")}' }).catch(e => console.error('Fehler:', e))"
+        onclick="window.__requestRoute(${piste.lat}, ${piste.lon})"
       >
-        Details anzeigen
+        Route anzeigen
       </button>
     </div>
   `;
@@ -192,52 +195,24 @@ function clearStandorte() {
   standorteLayer.clearLayers();
 }
 
-function setBoundary(boundary?: [number, number, number, number]) {
-  boundaryLayer.clearLayers();
-  if (!boundary || boundary.length !== 4) return;
+function drawRoute(coords: number[][]) {
+  routeLayer.clearLayers();
 
-  // Strings → Zahlen (Sicherheit)
-  const [minLat, maxLat, minLon, maxLon] = boundary.map(Number);
-  if (![minLat, maxLat, minLon, maxLon].every(Number.isFinite)) return;
-
-  // ✅ Zentrum der Bounding Box
-  const center = L.latLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
-
-  // ✅ Radius: Abstand Zentrum → entfernteste Ecke der BBox (in Metern)
-  const corner = L.latLng(maxLat, maxLon);
-  const radius = center.distanceTo(corner);
-
-  // ✅ Blau-roter "gestreifter" Kreis: zwei überlagerte gestrichelte Kreise
-  const blueCircle = L.circle(center, {
-    radius,
-    color: "#2563eb", // Blau
-    weight: 4,
-    fill: false, // ✅ nicht gefüllt
-    dashArray: "12 12", // 12px Strich, 12px Lücke
-    dashOffset: "0",
-  });
-
-  const redCircle = L.circle(center, {
-    radius,
-    color: "#ef4444", // Rot
-    weight: 4,
-    fill: false, // ✅ nicht gefüllt
-    dashArray: "12 12",
-    dashOffset: "12", // ✅ Versatz → Rot füllt Blaus Lücken
-  });
-
-  boundaryLayer.addLayer(blueCircle);
-  boundaryLayer.addLayer(redCircle);
+  const polyline = L.polyline(coords as L.LatLngExpression[], {
+    color: "#ff69b4", // Pink
+    weight: 3, // dünn
+    opacity: 0.9,
+  }).addTo(routeLayer);
 
   try {
-    map.fitBounds(blueCircle.getBounds(), { padding: [40, 40] });
+    map.fitBounds(polyline.getBounds(), { padding: [50, 50] }); // optional: auf Route zoomen
   } catch {
     // ignore invalid geometry
   }
 }
 
-function clearBoundary() {
-  boundaryLayer.clearLayers();
+function clearRoute() {
+  routeLayer.clearLayers();
 }
 
 function getDifficultyColor(diff?: string) {
@@ -271,8 +246,6 @@ defineExpose({
   clearPisteMarkers,
   showStandorte,
   clearStandorte,
-  setBoundary,
-  clearBoundary,
   setView,
 });
 
@@ -281,11 +254,32 @@ onMounted(() => {
   addUserMarker(props.pos);
   // ✅ Tauri global verfügbar machen (für Leaflet-Popups)
   (window as any).__tauriInvoke = invoke;
+
+  (window as any).__requestRoute = async (lat: number, lon: number) => {
+    if (!currentPos) {
+      console.error(
+        "Kein Standort gesetzt – bitte zuerst einen Standort auswählen.",
+      );
+      return;
+    }
+    try {
+      const route = await invoke<number[][]>("fetch_route", {
+        startLat: currentPos.lat, // JS camelCase → Rust snake_case (start_lat)
+        startLon: currentPos.lon,
+        endLat: lat,
+        endLon: lon,
+      });
+      drawRoute(route);
+    } catch (e) {
+      console.error("Routing-Fehler:", e);
+    }
+  };
 });
 
 onBeforeUnmount(() => {
   map.remove();
   // ✅ Optional: Tauri wieder entfernen
   delete (window as any).__tauriInvoke;
+  delete (window as any).__requestRoute;
 });
 </script>

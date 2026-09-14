@@ -77,7 +77,6 @@ async function getStandort() {
     selectedStandort.value = null;
     errorRef.value = null;
     mapRef.value?.showStandorte(standorteRef.value);
-    mapRef.value?.clearBoundary();
     isOpen.value = true;
   } catch (error: unknown) {
     standorteRef.value = [];
@@ -92,7 +91,6 @@ function selectStandort(standort: Standort) {
   selectedStandort.value = standort;
   posRef.value = standort.pos;
   mapRef.value?.setView(standort.pos);
-  mapRef.value?.setBoundary(standort.boundary);
   mapRef.value?.showStandorte(standorteRef.value, standort.id);
 }
 
@@ -105,7 +103,6 @@ function clearResults() {
   selectedStandort.value = null;
   lastQueryRef.value = "";
   mapRef.value?.clearStandorte();
-  mapRef.value?.clearBoundary();
   isOpen.value = false;
 }
 

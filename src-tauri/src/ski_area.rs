@@ -141,3 +141,104 @@ pub async fn test_overpass_api() -> Result<String, String> {
         .map_err(|e| format!("Body error: {}", e))?;
     Ok(text)
 }
+
+#[tauri::command]
+pub async fn fetch_route(
+    start_lat: f64,
+    start_lon: f64,
+    end_lat: f64,
+    end_lon: f64,
+) -> Result<Vec<Vec<f64>>, String> {
+    println!(
+        "🖱️ fetch_route aufgerufen: start=({}, {}), end=({}, {})",
+        start_lat, start_lon, end_lat, end_lon
+    ); // ✅ Wird der Button überhaupt erreicht?
+
+    // ⚠️ OSRM erwartet lon,lat (nicht lat,lon!)
+    let url = format!(
+        "https://router.project-osrm.org/route/v1/driving/{},{};{},{}?overview=full&geometries=geojson",
+        start_lon, start_lat, end_lon, end_lat
+    );
+
+    println!("🌐 Routing-URL: {}", url); // ✅ Debug-Log
+
+    let client = Client::new();
+    let res = match client
+        .get(&url)
+        .header("User-Agent", "ski-explorer-app (your@email.com)")
+        .send()
+        .await
+    {
+        Ok(r) => {
+            println!("📡 HTTP Status: {}", r.status()); // ✅ Debug-Log
+            r
+        }
+        Err(e) => {
+            println!("❌ HTTP request failed: {}", e);
+            return Err(format!("HTTP request failed: {}", e));
+        }
+    };
+
+    let text = match res.text().await {
+        Ok(t) => {
+            println!("📄 Raw response: {}", t); // ✅ Debug-Log (kann sehr lang sein!)
+            t
+        }
+        Err(e) => {
+            println!("❌ Failed to read body: {}", e);
+            return Err(format!("Failed to read response body: {}", e));
+        }
+    };
+
+    let json: Value = match serde_json::from_str(&text) {
+        Ok(j) => j,
+        Err(e) => {
+            println!("❌ JSON parse error: {}", e);
+            return Err(format!("Failed to parse JSON: {}", e));
+        }
+    };
+
+    let code = json.get("code").and_then(|c| c.as_str()).unwrap_or("?");
+    println!("🔍 OSRM code: {}", code); // ✅ Debug-Log
+
+    if code != "Ok" {
+        return Err(format!("OSRM-Fehler: {}", text));
+    }
+
+    let coords = match json
+        .get("routes")
+        .and_then(|r| r.as_array())
+        .and_then(|r| r.first())
+        .and_then(|r| r.get("geometry"))
+        .and_then(|g| g.get("coordinates"))
+        .and_then(|c| c.as_array())
+    {
+        Some(c) => {
+            println!("✅ {} Koordinatenpunkte erhalten", c.len()); // ✅ Debug-Log
+            c
+        }
+        None => {
+            println!("❌ Keine Koordinaten in der Antwort gefunden");
+            return Err("Keine Route in der Antwort gefunden".to_string());
+        }
+    };
+
+    let route: Vec<Vec<f64>> = coords
+        .iter()
+        .filter_map(|c| {
+            let arr = c.as_array()?;
+            let lon = arr.first()?.as_f64()?;
+            let lat = arr.get(1)?.as_f64()?;
+            Some(vec![lat, lon])
+        })
+        .collect();
+
+    println!(
+        "🗺️ Route fertig: {} Punkte | erster: {:?} | letzter: {:?}",
+        route.len(),
+        route.first(),
+        route.last()
+    ); // ✅ Debug-Log
+
+    Ok(route)
+}
