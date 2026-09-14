@@ -10,7 +10,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ski_area::fetch_ski_areas,
             standort::get_standort,
-            ski_area::test_overpass_api,
             ski_area::log_piste_coordinates,
             ski_area::fetch_route,
         ])

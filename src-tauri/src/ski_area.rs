@@ -120,29 +120,6 @@ pub fn log_piste_coordinates(lat: f64, lon: f64, name: String) {
 }
 
 #[tauri::command]
-pub async fn test_overpass_api() -> Result<String, String> {
-    let client = Client::new();
-
-    // ✅ URL-encoded Query (wichtig für GET)
-    let query = "data=[out:json][timeout:25];(node(around:5000,47.26,11.39)[%22piste:type%22=%22downhill%22];way(around:50000,47.26,11.39)[%22piste:type%22=%22downhill%22];relation(around:50000,47.26,11.39)[%22piste:type%22=%22downhill%22];);out center tags;";
-
-    let url = format!("https://overpass-api.de/api/interpreter?{}", query);
-
-    let response = client
-        .get(&url) // ✅ GET statt POST
-        .header("User-Agent", "ski-explorer-app (your@email.com)") // ✅ Pflicht!
-        .send()
-        .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
-
-    let text = response
-        .text()
-        .await
-        .map_err(|e| format!("Body error: {}", e))?;
-    Ok(text)
-}
-
-#[tauri::command]
 pub async fn fetch_route(
     start_lat: f64,
     start_lon: f64,
