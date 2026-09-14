@@ -19,6 +19,10 @@ let standorteLayer: L.LayerGroup;
 let routeLayer: L.LayerGroup;
 let currentPos: Position | null = null; // merkt sich den gewählten Standort
 
+const emit = defineEmits<{
+  (e: "positionChanged", pos: Position): void;
+}>();
+
 function initMap(pos: Position) {
   map = L.map("map").setView([pos.lat, pos.lon], 9);
 
@@ -127,7 +131,27 @@ function buildPopupHtml(piste: SkiArea, color: string, difficultyText: string) {
 
 function addUserMarker(pos: Position) {
   userLayer.clearLayers();
-  L.marker([pos.lat, pos.lon]).addTo(userLayer).bindPopup("Dein Standort");
+
+  const marker = L.marker([pos.lat, pos.lon], { draggable: true }) // ✅ ziehbar
+    .addTo(userLayer)
+    .bindPopup("Dein Standort");
+
+  marker.on("dragend", () => {
+    const newPos = marker.getLatLng();
+
+    routeLayer.clearLayers();
+
+    // ✅ currentPos aktualisieren (wichtig fürs Routing!)
+    currentPos = { lat: newPos.lat, lon: newPos.lng };
+
+    // Popup zeigt die neuen Koordinaten
+    marker.setPopupContent(
+      `Dein Standort<br><small>${newPos.lat.toFixed(5)}, ${newPos.lng.toFixed(5)}</small>`,
+    );
+
+    // ✅ App.vue benachrichtigen (damit "Pisten laden" die neue Position nutzt)
+    emit("positionChanged", { lat: newPos.lat, lon: newPos.lng });
+  });
 }
 
 function addPisteMarkers(pistes: SkiArea[]) {

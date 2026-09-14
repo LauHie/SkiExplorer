@@ -93,6 +93,10 @@ function selectStandort(standort: Standort) {
   mapRef.value?.showStandorte(standorteRef.value, standort.id);
 }
 
+function onPositionChanged(pos: Position) {
+  posRef.value = pos;
+}
+
 function openResults() {
   if (hasResults.value) isOpen.value = true;
 }
@@ -268,6 +272,7 @@ function clearResults() {
         ref="mapRef"
         class="h-full w-full overflow-hidden rounded-xl border border-border shadow-lg"
         :pos="posRef"
+        @position-changed="onPositionChanged"
       />
     </main>
 
