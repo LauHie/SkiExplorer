@@ -18,6 +18,7 @@ let userLayer: L.LayerGroup;
 let standorteLayer: L.LayerGroup;
 let routeLayer: L.LayerGroup;
 let currentPos: Position | null = null; // merkt sich den gewählten Standort
+let bikeLayer: L.LayerGroup;
 
 const emit = defineEmits<{
   (e: "positionChanged", pos: Position): void;
@@ -34,6 +35,7 @@ function initMap(pos: Position) {
   standorteLayer = L.layerGroup().addTo(map);
   userLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
+  bikeLayer = L.layerGroup().addTo(map);
   currentPos = pos;
 }
 
@@ -87,6 +89,32 @@ function createFreerideMarker(lat: number, lon: number) {
   });
 
   return L.marker([lat, lon], { icon }).addTo(pisteLayer);
+}
+
+function createBikeMarker(lat: number, lon: number, layer: L.LayerGroup) {
+  const svg = `
+    <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <!-- Grüner Kreis mit weißem Rand -->
+      <circle cx="12" cy="12" r="10.5" fill="#16a34a" stroke="#ffffff" stroke-width="1.5"/>
+      <!-- Fahrrad-Symbol -->
+      <g stroke="#ffffff" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="7" cy="15" r="3.2"/>
+        <circle cx="17" cy="15" r="3.2"/>
+        <path d="M7 15 L10 9.5 H13.5 L17 15"/>
+        <path d="M10 9.5 L12.5 15 L7 15"/>
+        <path d="M13.5 9.5 L15 8 H16.5"/>
+      </g>
+    </svg>
+  `;
+
+  const icon = L.divIcon({
+    html: svg,
+    className: "bike-marker",
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+
+  return L.marker([lat, lon], { icon }).addTo(layer);
 }
 
 function buildPopupHtml(piste: SkiArea, color: string, difficultyText: string) {
@@ -161,7 +189,19 @@ function addPisteMarkers(pistes: SkiArea[]) {
     const difficulty = piste.difficulty?.toLowerCase();
     const color = getDifficultyColor(difficulty);
 
-    if (!difficulty || difficulty === "unbekannt" || difficulty === "unknown") {
+    if (piste.is_bike) {
+      // ✅ Fahrrad-Route → Bike-Marker
+      const marker = createBikeMarker(piste.lat, piste.lon, pisteLayer);
+      const diffText =
+        difficulty && difficulty !== "unbekannt" && difficulty !== "unknown"
+          ? piste.difficulty
+          : "Bike-Route 🚲";
+      marker.bindPopup(buildPopupHtml(piste, color, diffText));
+    } else if (
+      !difficulty ||
+      difficulty === "unbekannt" ||
+      difficulty === "unknown"
+    ) {
       // ✅ Unbekannt → gestreifter Marker
       const marker = createStripedMarker(piste.lat, piste.lon);
       marker.bindPopup(buildPopupHtml(piste, color, "unbekannt ❓"));
@@ -185,6 +225,26 @@ function addPisteMarkers(pistes: SkiArea[]) {
 
 function clearPisteMarkers() {
   pisteLayer.clearLayers();
+}
+
+function addBikeMarkers(routes: SkiArea[]) {
+  bikeLayer.clearLayers();
+
+  routes.forEach((r) => {
+    const difficulty = r.difficulty?.toLowerCase();
+    const color = getDifficultyColor(difficulty);
+
+    const marker = createBikeMarker(r.lat, r.lon, bikeLayer);
+    const diffText =
+      difficulty && difficulty !== "unbekannt" && difficulty !== "unknown"
+        ? r.difficulty
+        : "Bike-Route 🚲";
+    marker.bindPopup(buildPopupHtml(r, color, diffText));
+  });
+}
+
+function clearBikeMarkers() {
+  bikeLayer.clearLayers();
 }
 
 function showStandorte(standorte: Standort[], selectedId?: number) {
@@ -295,6 +355,8 @@ defineExpose({
   showStandorte,
   clearStandorte,
   setView,
+  addBikeMarkers,
+  clearBikeMarkers,
 });
 
 onMounted(() => {

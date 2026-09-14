@@ -12,6 +12,7 @@ pub fn run() {
             standort::get_standort,
             ski_area::log_piste_coordinates,
             ski_area::fetch_route,
+            ski_area::fetch_bike_routes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

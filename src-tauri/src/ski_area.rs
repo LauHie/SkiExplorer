@@ -1,6 +1,6 @@
 use crate::types::Position;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Serialize)] //Serialize um an Front-End zu senden
@@ -11,16 +11,11 @@ pub struct SkiArea {
     pub lon: f64,
     pub difficulty: String,
     pub operator: Option<String>,
+    pub is_bike: bool,
 }
 
-#[tauri::command]
-pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
-    // ✅ Korrigierte Query mit vollständiger URL-Encoding
-    let query = format!(
-        "data=[out:json][timeout:25];(way(around:{},{},{})[%22piste:type%22=%22downhill%22];);out center tags;",
-        radius, position.lat, position.lon
-    );
-
+// ✅ Gemeinsamer Helper (enthält die komplette Abruf- und Parse-Logik)
+async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
     let url = format!("https://overpass-api.de/api/interpreter?{}", query);
 
     let client = Client::new();
@@ -36,10 +31,7 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
         {
             Ok(res) => {
                 let text = match res.text().await {
-                    Ok(t) => {
-                        println!("📄 Raw response: {}", t); // ✅ Debug-Log
-                        t
-                    }
+                    Ok(t) => t,
                     Err(e) => {
                         last_err = Some(format!("Failed to read response body: {}", e));
                         continue;
@@ -59,8 +51,6 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
                         continue;
                     }
                 };
-
-                println!("{}", serde_json::to_string_pretty(&json).unwrap());
 
                 let mut ski_areas = Vec::new();
                 if let Some(elements) = json.get("elements").and_then(|e| e.as_array()) {
@@ -87,6 +77,14 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
                             .unwrap_or("unbekannt")
                             .to_string();
 
+                        // ✅ Fahrrad-Route erkennen (mtb:scale oder bicycle=designated)
+                        let is_bike = tags.get("mtb:scale").is_some()
+                            || tags
+                                .get("bicycle")
+                                .and_then(|v| v.as_str())
+                                .map(|v| v == "designated")
+                                .unwrap_or(false);
+
                         if lat != 0.0 && lon != 0.0 {
                             ski_areas.push(SkiArea {
                                 id: el.get("id").and_then(|v| v.as_i64()).unwrap_or(0),
@@ -98,16 +96,40 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
                                     .get("operator")
                                     .and_then(|v| v.as_str())
                                     .map(String::from),
+                                is_bike,
                             });
                         }
                     }
                 }
+
+                println!("✅ Overpass: {} Ergebnisse geladen", ski_areas.len()); // ✅ kompaktes Debug-Log
+
                 return Ok(ski_areas);
             }
             Err(e) => last_err = Some(format!("HTTP request failed (attempt {}): {}", attempt, e)),
         }
     }
     Err(last_err.unwrap_or_else(|| "Unknown Overpass error".to_string()))
+}
+
+#[tauri::command]
+pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
+    // ✅ Nur Pisten (downhill) – Union wieder entfernt
+    let query = format!(
+        "data=[out:json][timeout:25];(way(around:{},{},{})[%22piste:type%22=%22downhill%22];);out center tags;",
+        radius, position.lat, position.lon
+    );
+    fetch_overpass(query).await
+}
+
+#[tauri::command]
+pub async fn fetch_bike_routes(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
+    // ✅ Nur Bike-Routen (mtb:scale)
+    let query = format!(
+        "data=[out:json][timeout:25];(way(around:{},{},{})[%22mtb:scale%22];);out center tags;",
+        radius, position.lat, position.lon
+    );
+    fetch_overpass(query).await
 }
 
 #[tauri::command]

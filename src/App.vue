@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import MapView from "./components/Map.vue";
-import { loadSkiAreas } from "./services/skiService";
 import { Position } from "./types/position";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useTauriDesktopGuards } from "./composables/useTauriDesktopGuards";
 import { Spinner } from "@/components/ui/spinner";
 import { loadStandort, Standort } from "./services/standortService";
+import { loadSkiAreas, loadBikeRoutes } from "./services/skiService";
+import {
+  Mountain,
+  MapPin,
+  Search,
+  List,
+  AlertCircle,
+  ChevronRight,
+  Ruler,
+  Bike, // ✅ NEU
+} from "lucide-vue-next";
 import {
   Sheet,
   SheetClose,
@@ -17,15 +27,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Mountain,
-  MapPin,
-  Search,
-  List,
-  AlertCircle,
-  ChevronRight,
-  Ruler,
-} from "lucide-vue-next";
 
 useTauriDesktopGuards({
   blockFileDrop: true,
@@ -44,6 +45,7 @@ const isOpen = ref(false);
 const standorteRef = ref<Standort[]>([]);
 const selectedStandort = ref<Standort | null>(null);
 const lastQueryRef = ref<string>("");
+const waitingForBikeApi = ref(false);
 
 const hasResults = computed(() => standorteRef.value.length > 0);
 
@@ -58,6 +60,22 @@ async function getSkiAreas(pos: Position) {
     }
   } catch (error: unknown) {
     waitingForApi.value = false;
+    errorRef.value =
+      error instanceof Error ? error.message : "Unbekannter Fehler";
+  }
+}
+
+async function getBikeRoutes(pos: Position) {
+  try {
+    if (sliderRef.value) {
+      waitingForBikeApi.value = true;
+      const routes = await loadBikeRoutes(pos, sliderRef.value[0] * 1000);
+      waitingForBikeApi.value = false;
+      mapRef.value?.addBikeMarkers(routes);
+      errorRef.value = null;
+    }
+  } catch (error: unknown) {
+    waitingForBikeApi.value = false;
     errorRef.value =
       error instanceof Error ? error.message : "Unbekannter Fehler";
   }
@@ -229,6 +247,19 @@ function clearResults() {
             <template v-else>
               <Mountain class="size-4" />
               <span>Pisten laden</span>
+            </template>
+          </Button>
+
+          <Button
+            variant="default"
+            class="w-full"
+            :disabled="waitingForBikeApi"
+            @click="getBikeRoutes(posRef)"
+          >
+            <Spinner v-if="waitingForBikeApi" />
+            <template v-else>
+              <Bike class="size-4" />
+              <span>Bike-Routen laden</span>
             </template>
           </Button>
         </section>
