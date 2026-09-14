@@ -1,7 +1,5 @@
-use std::{array, ptr::null};
-
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::types::Position;
 
@@ -18,10 +16,11 @@ pub struct Standort {
 pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String> {
     let client = Client::new();
 
-    // ✅ Nominatim statt Overpass
+    // ✅ URL manuell bauen (wie in ski_area.rs) – Leerzeichen/Kommas encodieren
+    let q = query_string.trim().replace(' ', "%20").replace(',', "%2C");
     let url = format!(
         "https://nominatim.openstreetmap.org/search?q={}&format=json&limit=10",
-        query_string
+        q
     );
 
     let res = client
@@ -32,14 +31,6 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
         .map_err(|e| format!("HTTP error: {}", e))?;
 
     let text = res.text().await.map_err(|e| format!("Body error: {}", e))?;
-
-    println!(
-        "RAW RESPONSE:\n{}",
-        serde_json::to_string_pretty(
-            &serde_json::from_str::<serde_json::Value>(&text).unwrap_or_default()
-        )
-        .unwrap_or(text.clone())
-    );
 
     let json: serde_json::Value =
         serde_json::from_str(&text).map_err(|e| format!("JSON parse error: {}", e))?;
@@ -75,19 +66,22 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
                 .unwrap_or("Unbekannt")
                 .to_string();
 
+            // ✅ boundingbox ist ein JSON-Array von Strings (kein String!)
+            // Nominatim-Order: [south, north, west, east] = [minLat, maxLat, minLon, maxLon]
+            // → passt genau zur erwarteten Reihenfolge im Frontend
             let boundary = el
                 .get("boundingbox")
-                .and_then(|v| v.as_str())
-                .and_then(|s| {
-                    s.split(',')
-                        .map(|x| x.parse::<f64>())
-                        .collect::<Result<Vec<_>, _>>()
-                        .ok()
-                });
+                .and_then(|v| v.as_array())
+                .and_then(|arr| {
+                    arr.iter()
+                        .map(|x| x.as_str().and_then(|s| s.parse::<f64>().ok()))
+                        .collect::<Option<Vec<f64>>>()
+                })
+                .filter(|v| v.len() == 4);
 
             if let (Some(lat), Some(lon)) = (lat, lon) {
                 results.push(Standort {
-                    id, // Nominatim hat keine ID → optional ersetzen
+                    id,
                     name,
                     pos: Position { lat, lon },
                     class,
@@ -97,6 +91,5 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
         }
     }
 
-    println!("{}", serde_json::to_string_pretty(&results).unwrap());
     Ok(results)
 }

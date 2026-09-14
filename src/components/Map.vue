@@ -10,6 +10,7 @@ import L from "leaflet";
 import type { SkiArea } from "../services/skiService";
 import type { Standort } from "../services/standortService";
 import { Position } from "../types/position";
+import { invoke } from "@tauri-apps/api/core"; // ✅ Wichtig
 
 let map: L.Map;
 let pisteLayer: L.LayerGroup;
@@ -37,6 +38,90 @@ function setView(pos: Position, zoom: number = 11) {
   addUserMarker(pos);
 }
 
+function createStripedMarker(lat: number, lon: number) {
+  const svg = `
+    <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <!-- Schwarzer Kreis mit weißem Rand -->
+      <circle cx="10" cy="10" r="8" fill="#000000" stroke="#ffffff" stroke-width="1.5"/>
+      <!-- Gelbe diagonale Streifen (direkt gezeichnet, ohne pattern) -->
+      <g stroke="#facc15" stroke-width="1.8" stroke-linecap="round">
+        <line x1="5.5" y1="9.5" x2="9.5" y2="5.5"/>
+        <line x1="6.5" y1="13.5" x2="13.5" y2="6.5"/>
+        <line x1="10.5" y1="14.5" x2="14.5" y2="10.5"/>
+      </g>
+    </svg>
+  `;
+
+  const icon = L.divIcon({
+    html: svg,
+    className: "striped-marker",
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+
+  return L.marker([lat, lon], { icon }).addTo(pisteLayer);
+}
+
+function createFreerideMarker(lat: number, lon: number) {
+  const svg = `
+    <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <!-- Orange Diamant mit weißem Rand -->
+      <path d="M10 1 L19 10 L10 19 L1 10 Z" fill="#f97316" stroke="#ffffff" stroke-width="1.5"/>
+      <!-- Kleines weißes Berg-Symbol -->
+      <path d="M6.5 12.5 L9 8.5 L10.5 10.5 L12 8 L13.5 12.5 Z" fill="#ffffff"/>
+    </svg>
+  `;
+
+  const icon = L.divIcon({
+    html: svg,
+    className: "freeride-marker",
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+
+  return L.marker([lat, lon], { icon }).addTo(pisteLayer);
+}
+
+function buildPopupHtml(piste: SkiArea, color: string, difficultyText: string) {
+  return `
+    <div style="
+      min-width: 220px;
+      padding: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    ">
+      <div style="margin-bottom: 8px;">
+        <b style="font-size: 16px; color: #1f2937;">${piste.name}</b>
+      </div>
+      <div style="margin-bottom: 12px; color: #6b7280; font-size: 14px;">
+        Schwierigkeit: <span style="color: ${color}; font-weight: 600;">${difficultyText}</span>
+      </div>
+      <button
+        style="
+          width: 100%;
+          padding: 10px 16px;
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+        "
+        onmouseover="this.style.background='linear-gradient(135deg, #1d4ed8, #1e40af)'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(37, 99, 235, 0.4)'"
+        onmouseout="this.style.background='linear-gradient(135deg, #2563eb, #1d4ed8)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(37, 99, 235, 0.3)'"
+        onclick="window.__tauriInvoke('log_piste_coordinates', { lat: ${piste.lat}, lon: ${piste.lon}, name: '${piste.name.replace(/'/g, "\\'")}' }).catch(e => console.error('Fehler:', e))"
+      >
+        Details anzeigen
+      </button>
+    </div>
+  `;
+}
+
 function addUserMarker(pos: Position) {
   userLayer.clearLayers();
   L.marker([pos.lat, pos.lon]).addTo(userLayer).bindPopup("Dein Standort");
@@ -46,14 +131,28 @@ function addPisteMarkers(pistes: SkiArea[]) {
   pisteLayer.clearLayers();
 
   pistes.forEach((piste) => {
-    L.circleMarker([piste.lat, piste.lon], {
-      radius: 6,
-      color: getDifficultyColor(piste.difficulty),
-      fillOpacity: 0.8,
-    }).addTo(pisteLayer).bindPopup(`
-        <b>${piste.name}</b><br/>
-        Schwierigkeit: ${piste.difficulty ?? "unbekannt"}
-      `);
+    const difficulty = piste.difficulty?.toLowerCase();
+    const color = getDifficultyColor(difficulty);
+
+    if (!difficulty || difficulty === "unbekannt" || difficulty === "unknown") {
+      // ✅ Unbekannt → gestreifter Marker
+      const marker = createStripedMarker(piste.lat, piste.lon);
+      marker.bindPopup(buildPopupHtml(piste, color, "unbekannt ❓"));
+    } else if (difficulty === "freeride") {
+      // ✅ Freeride → Diamant-Marker
+      const marker = createFreerideMarker(piste.lat, piste.lon);
+      marker.bindPopup(buildPopupHtml(piste, color, "Freeride 🏔️"));
+    } else {
+      // ✅ Bekannte Schwierigkeit → normaler Kreis-Marker
+      L.circleMarker([piste.lat, piste.lon], {
+        radius: 6,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.8,
+      })
+        .addTo(pisteLayer)
+        .bindPopup(buildPopupHtml(piste, color, piste.difficulty));
+    }
   });
 }
 
@@ -80,9 +179,12 @@ function showStandorte(standorte: Standort[], selectedId?: number) {
       iconSize: [28, 28],
       iconAnchor: [14, 14],
     });
-    L.marker([s.pos.lat, s.pos.lon], { icon })
-      .addTo(standorteLayer)
-      .bindPopup(`<b>${s.name}</b>`);
+
+    // Marker erstellen und explizit kein Popup binden
+    const marker = L.marker([s.pos.lat, s.pos.lon], { icon }).addTo(
+      standorteLayer,
+    );
+    marker.unbindPopup(); // Stelle sicher, dass kein Popup existiert
   });
 }
 
@@ -90,61 +192,48 @@ function clearStandorte() {
   standorteLayer.clearLayers();
 }
 
-function bboxToGeoJSON(boundary: [number, number, number, number]) {
-  const [minLat, maxLat, minLon, maxLon] = boundary;
-
-  return {
-    type: "Feature",
-    geometry: {
-      type: "Polygon",
-      coordinates: [
-        [
-          [minLon, minLat],
-          [maxLon, minLat],
-          [maxLon, maxLat],
-          [minLon, maxLat],
-          [minLon, minLat], // schließen
-        ],
-      ],
-    },
-    properties: {},
-  };
-}
-
 function setBoundary(boundary?: [number, number, number, number]) {
   boundaryLayer.clearLayers();
-  if (!boundary) return;
-  const bound = bboxToGeoJSON(boundary);
-  const layer = L.geoJSON(bound as any, {
-    style: {
-      color: "#2563eb",
-      weight: 4, // vorher 2 → dicker
-      opacity: 1, // vorher 0.9
-      fillColor: "#3b82f6",
-      fillOpacity: 0.25, // vorher 0.15 → stärker sichtbar
-    },
-  }).addTo(boundaryLayer);
+  if (!boundary || boundary.length !== 4) return;
+
+  // Strings → Zahlen (Sicherheit)
+  const [minLat, maxLat, minLon, maxLon] = boundary.map(Number);
+  if (![minLat, maxLat, minLon, maxLon].every(Number.isFinite)) return;
+
+  // ✅ Zentrum der Bounding Box
+  const center = L.latLng((minLat + maxLat) / 2, (minLon + maxLon) / 2);
+
+  // ✅ Radius: Abstand Zentrum → entfernteste Ecke der BBox (in Metern)
+  const corner = L.latLng(maxLat, maxLon);
+  const radius = center.distanceTo(corner);
+
+  // ✅ Blau-roter "gestreifter" Kreis: zwei überlagerte gestrichelte Kreise
+  const blueCircle = L.circle(center, {
+    radius,
+    color: "#2563eb", // Blau
+    weight: 4,
+    fill: false, // ✅ nicht gefüllt
+    dashArray: "12 12", // 12px Strich, 12px Lücke
+    dashOffset: "0",
+  });
+
+  const redCircle = L.circle(center, {
+    radius,
+    color: "#ef4444", // Rot
+    weight: 4,
+    fill: false, // ✅ nicht gefüllt
+    dashArray: "12 12",
+    dashOffset: "12", // ✅ Versatz → Rot füllt Blaus Lücken
+  });
+
+  boundaryLayer.addLayer(blueCircle);
+  boundaryLayer.addLayer(redCircle);
 
   try {
-    map.fitBounds(layer.getBounds(), { padding: [40, 40] });
-    map.addLayer(boundaryLayer);
-
-    map = L.map("map", {
-      preferCanvas: false,
-    });
-
-    map.createPane("boundaryPane");
-    map.getPane("boundaryPane")!.style.zIndex = "650";
+    map.fitBounds(blueCircle.getBounds(), { padding: [40, 40] });
   } catch {
     // ignore invalid geometry
   }
-  L.geoJSON(bound as any, {
-    pane: "boundaryPane",
-    style: {
-      color: "#2563eb",
-      weight: 4,
-    },
-  }).addTo(boundaryLayer);
 }
 
 function clearBoundary() {
@@ -152,15 +241,24 @@ function clearBoundary() {
 }
 
 function getDifficultyColor(diff?: string) {
-  switch (diff) {
-    case "blue":
-      return "blue";
-    case "red":
-      return "red";
+  const difficulty = diff?.toLowerCase();
+  switch (difficulty) {
+    case "easy":
+    case "novice":
+      return "#3b82f6"; // Blau (Anfänger)
+    case "intermediate":
+      return "#f59e0b"; // Gelb (Mittel)
+    case "advanced":
+    case "hard":
+    case "expert":
+    case "extreme":
     case "black":
-      return "black";
+    case "double_black":
+      return "#ef4444"; // Rot (Schwer/Experte)
+    case "freeride":
+      return "#f97316"; // Orange (für die Anzeige im Popup)
     default:
-      return "gray";
+      return "#9ca3af"; // Grau (unbekannt)
   }
 }
 const props = defineProps<{
@@ -181,9 +279,13 @@ defineExpose({
 onMounted(() => {
   initMap(props.pos);
   addUserMarker(props.pos);
+  // ✅ Tauri global verfügbar machen (für Leaflet-Popups)
+  (window as any).__tauriInvoke = invoke;
 });
 
 onBeforeUnmount(() => {
   map.remove();
+  // ✅ Optional: Tauri wieder entfernen
+  delete (window as any).__tauriInvoke;
 });
 </script>

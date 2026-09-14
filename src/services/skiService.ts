@@ -12,7 +12,7 @@ export interface SkiArea {
 
 export async function loadSkiAreas(
   position: Position,
-  radius = 50000
+  radius = 50000,
 ): Promise<SkiArea[]> {
   try {
     return await invoke<SkiArea[]>("fetch_ski_areas", {
@@ -28,5 +28,19 @@ export async function loadSkiAreas(
     }
 
     throw new Error("OSM API überlastet");
+  }
+}
+
+// skiService.ts
+export async function logPisteCoordinates(
+  lat: number,
+  lon: number,
+  name: string,
+): Promise<void> {
+  try {
+    await invoke("log_piste_coordinates", { lat, lon, name });
+  } catch (error) {
+    console.error("Failed to log piste coordinates:", error);
+    throw error;
   }
 }

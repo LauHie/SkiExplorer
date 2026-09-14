@@ -111,6 +111,15 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
 }
 
 #[tauri::command]
+pub fn log_piste_coordinates(lat: f64, lon: f64, name: String) {
+    println!(
+        "Piste '{}' angeklickt: Latitude = {}, Longitude = {}",
+        name, lat, lon
+    );
+    // Hier kannst du später weitere Logik hinzufügen (z. B. Datenbankabfrage)
+}
+
+#[tauri::command]
 pub async fn test_overpass_api() -> Result<String, String> {
     let client = Client::new();
 
