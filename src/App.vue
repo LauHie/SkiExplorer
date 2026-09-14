@@ -109,12 +109,11 @@ function clearResults() {
   isOpen.value = false;
 }
 
-// In App.vue, im <script setup>-Bereich
 const testOverpassApi = async () => {
   try {
-    console.log("🧪 Starte Overpass API Test...");
+    console.log("Starte Overpass API Test...");
     const result = await invoke<string>("test_overpass_api");
-    console.log("✅ Overpass API Test erfolgreich:", result);
+    console.log("Overpass API Test erfolgreich:", result);
     errorRef.value = null;
     // Optional: Zeige das Ergebnis in der UI an
     alert(

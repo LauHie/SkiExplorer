@@ -1,0 +1,11 @@
+[env]
+# Erzwinge Ninja für aws-lc-sys
+AWS_LC_SYS_CMAKE_GENERATOR = "Ninja"
+CMAKE_GENERATOR = "Ninja"
+
+# NDK-Pfade explizit setzen
+ANDROID_NDK_ROOT = "C:\\Users\\Laurenz\\AppData\\Local\\Android\\Sdk\\ndk\\29.0.13846066"
+ANDROID_NDK = "C:\\Users\\Laurenz\\AppData\\Local\\Android\\Sdk\\ndk\\29.0.13846066"
+
+# Ninja-Pfad hinzufügen
+PATH = "C:\\Program Files\\Microsoft Visual Studio\\18\\Insiders\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja;${PATH}"
