@@ -36,7 +36,7 @@ useTauriDesktopGuards({
 
 const mapRef = ref<InstanceType<typeof MapView>>();
 const posRef = ref<Position>({ lat: 52.52437, lon: 13.41053 });
-const sliderRef = ref<number[] | undefined>([5]);
+const sliderRef = ref<number[] | undefined>([2]);
 const errorRef = ref<string | null>(null);
 const waitingForApi = ref(false);
 const searchingRef = ref(false);
@@ -223,17 +223,17 @@ function clearResults() {
             <Slider
               :value="sliderRef"
               @update:modelValue="sliderRef = $event"
-              :max="500"
-              :step="5"
+              :max="100"
+              :step="2"
             />
             <div class="flex items-center justify-between text-xs">
-              <span class="text-muted-foreground">0 km</span>
+              <span class="text-muted-foreground">2 km</span>
               <span
                 class="rounded-md bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground tabular-nums"
               >
                 {{ sliderRef?.[0] ?? 0 }} km
               </span>
-              <span class="text-muted-foreground">500 km</span>
+              <span class="text-muted-foreground">100 km</span>
             </div>
           </div>
 
