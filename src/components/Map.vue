@@ -227,23 +227,35 @@ function clearPisteMarkers() {
   pisteLayer.clearLayers();
 }
 
-function addBikeMarkers(routes: SkiArea[]) {
+function addBikeLines(routes: SkiArea[]) {
   bikeLayer.clearLayers();
 
   routes.forEach((r) => {
-    const difficulty = r.difficulty?.toLowerCase();
-    const color = getDifficultyColor(difficulty);
+    if (!r.geometry || r.geometry.length < 2) return;
 
-    const marker = createBikeMarker(r.lat, r.lon, bikeLayer);
-    const diffText =
-      difficulty && difficulty !== "unbekannt" && difficulty !== "unknown"
-        ? r.difficulty
-        : "Bike-Route 🚲";
-    marker.bindPopup(buildPopupHtml(r, color, diffText));
+    // 1. Weiße Umrandung (Casing)
+    L.polyline(r.geometry as L.LatLngExpression[], {
+      color: "#ffffff",
+      weight: 7,
+      opacity: 0.85,
+      lineCap: "round",
+      lineJoin: "round",
+    }).addTo(bikeLayer);
+
+    // 2. Grüne Linie darüber – klickbar → Popup mit Route-Button
+    L.polyline(r.geometry as L.LatLngExpression[], {
+      color: "#16a34a",
+      weight: 3.5,
+      opacity: 0.95,
+      lineCap: "round",
+      lineJoin: "round",
+    })
+      .addTo(bikeLayer)
+      .bindPopup(buildPopupHtml(r, "#16a34a", r.difficulty || "Bike-Route 🚲"));
   });
 }
 
-function clearBikeMarkers() {
+function clearBikeLines() {
   bikeLayer.clearLayers();
 }
 
@@ -355,8 +367,8 @@ defineExpose({
   showStandorte,
   clearStandorte,
   setView,
-  addBikeMarkers,
-  clearBikeMarkers,
+  addBikeLines,
+  clearBikeLines,
 });
 
 onMounted(() => {

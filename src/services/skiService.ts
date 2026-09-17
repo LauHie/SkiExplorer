@@ -9,6 +9,7 @@ export interface SkiArea {
   difficulty: string;
   operator?: string;
   is_bike: boolean;
+  geometry: number[][];
 }
 
 export async function loadSkiAreas(

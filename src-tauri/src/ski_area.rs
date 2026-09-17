@@ -12,9 +12,10 @@ pub struct SkiArea {
     pub difficulty: String,
     pub operator: Option<String>,
     pub is_bike: bool,
+    pub geometry: Vec<Vec<f64>>,
 }
 
-// ✅ Gemeinsamer Helper (enthält die komplette Abruf- und Parse-Logik)
+// Helper enthält die komplette Abruf- und Parse-Logik
 async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
     let url = format!("https://overpass-api.de/api/interpreter?{}", query);
 
@@ -25,7 +26,7 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
         match client
             .get(&url)
             .header("User-Agent", "ski-explorer-app (your@email.com)")
-            .header("Accept", "application/json") // ✅ WICHTIG
+            .header("Accept", "application/json")
             .send()
             .await
         {
@@ -38,7 +39,6 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
                     }
                 };
 
-                // ✅ Prüfe, ob die Antwort JSON ist
                 if !text.trim().starts_with('{') {
                     last_err = Some(format!("Overpass returned non-JSON: {}", text));
                     continue;
@@ -61,23 +61,45 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
                             .and_then(|v| v.as_str())
                             .unwrap_or("Unbenanntes Skigebiet")
                             .to_string();
-                        let lat = el
+
+                        let mut lat = el
                             .get("center")
                             .and_then(|c| c.get("lat"))
                             .and_then(|v| v.as_f64())
                             .unwrap_or(0.0);
-                        let lon = el
+                        let mut lon = el
                             .get("center")
                             .and_then(|c| c.get("lon"))
                             .and_then(|v| v.as_f64())
                             .unwrap_or(0.0);
+
                         let difficulty = tags
                             .get("piste:difficulty")
                             .and_then(|v| v.as_str())
                             .unwrap_or("unbekannt")
                             .to_string();
 
-                        // ✅ Fahrrad-Route erkennen (mtb:scale oder bicycle=designated)
+                        let geometry: Vec<Vec<f64>> = el
+                            .get("geometry")
+                            .and_then(|g| g.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|p| {
+                                        let plat = p.get("lat")?.as_f64()?;
+                                        let plon = p.get("lon")?.as_f64()?;
+                                        Some(vec![plat, plon])
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        // Kein "center" vorhanden (bei "out geom") → Mittelpunkt der Linie
+                        if lat == 0.0 && lon == 0.0 && !geometry.is_empty() {
+                            let mid = &geometry[geometry.len() / 2];
+                            lat = mid[0];
+                            lon = mid[1];
+                        }
+
                         let is_bike = tags.get("mtb:scale").is_some()
                             || tags
                                 .get("bicycle")
@@ -97,12 +119,13 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
                                     .and_then(|v| v.as_str())
                                     .map(String::from),
                                 is_bike,
+                                geometry,
                             });
                         }
                     }
                 }
 
-                println!("✅ Overpass: {} Ergebnisse geladen", ski_areas.len()); // ✅ kompaktes Debug-Log
+                println!("✅ Overpass: {} Ergebnisse geladen", ski_areas.len());
 
                 return Ok(ski_areas);
             }
@@ -114,7 +137,6 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
 
 #[tauri::command]
 pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
-    // ✅ Nur Pisten (downhill) – Union wieder entfernt
     let query = format!(
         "data=[out:json][timeout:25];(way(around:{},{},{})[%22piste:type%22=%22downhill%22];);out center tags;",
         radius, position.lat, position.lon
@@ -124,9 +146,8 @@ pub async fn fetch_ski_areas(position: Position, radius: u32) -> Result<Vec<SkiA
 
 #[tauri::command]
 pub async fn fetch_bike_routes(position: Position, radius: u32) -> Result<Vec<SkiArea>, String> {
-    // ✅ Nur Bike-Routen (mtb:scale)
     let query = format!(
-        "data=[out:json][timeout:25];(way(around:{},{},{})[%22mtb:scale%22];);out center tags;",
+        "data=[out:json][timeout:25];(way(around:{},{},{})[%22mtb:scale%22];);out geom tags;",
         radius, position.lat, position.lon
     );
     fetch_overpass(query).await
@@ -149,17 +170,16 @@ pub async fn fetch_route(
     end_lon: f64,
 ) -> Result<Vec<Vec<f64>>, String> {
     println!(
-        "🖱️ fetch_route aufgerufen: start=({}, {}), end=({}, {})",
+        "fetch_route aufgerufen: start=({}, {}), end=({}, {})",
         start_lat, start_lon, end_lat, end_lon
-    ); // ✅ Wird der Button überhaupt erreicht?
+    );
 
-    // ⚠️ OSRM erwartet lon,lat (nicht lat,lon!)
     let url = format!(
         "https://router.project-osrm.org/route/v1/driving/{},{};{},{}?overview=full&geometries=geojson",
         start_lon, start_lat, end_lon, end_lat
     );
 
-    println!("🌐 Routing-URL: {}", url); // ✅ Debug-Log
+    println!("🌐 Routing-URL: {}", url);
 
     let client = Client::new();
     let res = match client
@@ -169,7 +189,7 @@ pub async fn fetch_route(
         .await
     {
         Ok(r) => {
-            println!("📡 HTTP Status: {}", r.status()); // ✅ Debug-Log
+            println!("📡 HTTP Status: {}", r.status());
             r
         }
         Err(e) => {
@@ -180,7 +200,7 @@ pub async fn fetch_route(
 
     let text = match res.text().await {
         Ok(t) => {
-            println!("📄 Raw response: {}", t); // ✅ Debug-Log (kann sehr lang sein!)
+            println!("📄 Raw response: {}", t);
             t
         }
         Err(e) => {
@@ -198,7 +218,7 @@ pub async fn fetch_route(
     };
 
     let code = json.get("code").and_then(|c| c.as_str()).unwrap_or("?");
-    println!("🔍 OSRM code: {}", code); // ✅ Debug-Log
+    println!("🔍 OSRM code: {}", code);
 
     if code != "Ok" {
         return Err(format!("OSRM-Fehler: {}", text));
@@ -213,7 +233,7 @@ pub async fn fetch_route(
         .and_then(|c| c.as_array())
     {
         Some(c) => {
-            println!("✅ {} Koordinatenpunkte erhalten", c.len()); // ✅ Debug-Log
+            println!("✅ {} Koordinatenpunkte erhalten", c.len());
             c
         }
         None => {
@@ -237,7 +257,7 @@ pub async fn fetch_route(
         route.len(),
         route.first(),
         route.last()
-    ); // ✅ Debug-Log
+    );
 
     Ok(route)
 }

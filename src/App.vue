@@ -71,7 +71,7 @@ async function getBikeRoutes(pos: Position) {
       waitingForBikeApi.value = true;
       const routes = await loadBikeRoutes(pos, sliderRef.value[0] * 1000);
       waitingForBikeApi.value = false;
-      mapRef.value?.addBikeMarkers(routes);
+      mapRef.value?.addBikeLines(routes);
       errorRef.value = null;
     }
   } catch (error: unknown) {
