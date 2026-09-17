@@ -160,7 +160,7 @@ function buildPopupHtml(piste: SkiArea, color: string, difficultyText: string) {
 function addUserMarker(pos: Position) {
   userLayer.clearLayers();
 
-  const marker = L.marker([pos.lat, pos.lon], { draggable: true }) // ✅ ziehbar
+  const marker = L.marker([pos.lat, pos.lon], { draggable: true })
     .addTo(userLayer)
     .bindPopup("Dein Standort");
 
@@ -169,7 +169,6 @@ function addUserMarker(pos: Position) {
 
     routeLayer.clearLayers();
 
-    // ✅ currentPos aktualisieren (wichtig fürs Routing!)
     currentPos = { lat: newPos.lat, lon: newPos.lng };
 
     // Popup zeigt die neuen Koordinaten
@@ -177,7 +176,6 @@ function addUserMarker(pos: Position) {
       `Dein Standort<br><small>${newPos.lat.toFixed(5)}, ${newPos.lng.toFixed(5)}</small>`,
     );
 
-    // ✅ App.vue benachrichtigen (damit "Pisten laden" die neue Position nutzt)
     emit("positionChanged", { lat: newPos.lat, lon: newPos.lng });
   });
 }
@@ -190,7 +188,6 @@ function addPisteMarkers(pistes: SkiArea[]) {
     const color = getDifficultyColor(difficulty);
 
     if (piste.is_bike) {
-      // ✅ Fahrrad-Route → Bike-Marker
       const marker = createBikeMarker(piste.lat, piste.lon, pisteLayer);
       const diffText =
         difficulty && difficulty !== "unbekannt" && difficulty !== "unknown"
@@ -202,15 +199,12 @@ function addPisteMarkers(pistes: SkiArea[]) {
       difficulty === "unbekannt" ||
       difficulty === "unknown"
     ) {
-      // ✅ Unbekannt → gestreifter Marker
       const marker = createStripedMarker(piste.lat, piste.lon);
       marker.bindPopup(buildPopupHtml(piste, color, "unbekannt ❓"));
     } else if (difficulty === "freeride") {
-      // ✅ Freeride → Diamant-Marker
       const marker = createFreerideMarker(piste.lat, piste.lon);
       marker.bindPopup(buildPopupHtml(piste, color, "Freeride 🏔️"));
     } else {
-      // ✅ Bekannte Schwierigkeit → normaler Kreis-Marker
       L.circleMarker([piste.lat, piste.lon], {
         radius: 6,
         color: color,
@@ -338,10 +332,6 @@ function drawRoute(coords: number[][]) {
   }
 }
 
-function clearRoute() {
-  routeLayer.clearLayers();
-}
-
 function getDifficultyColor(diff?: string) {
   const difficulty = diff?.toLowerCase();
   switch (difficulty) {
@@ -381,7 +371,6 @@ defineExpose({
 onMounted(() => {
   initMap(props.pos);
   addUserMarker(props.pos);
-  // ✅ Tauri global verfügbar machen (für Leaflet-Popups)
   (window as any).__tauriInvoke = invoke;
 
   (window as any).__requestRoute = async (lat: number, lon: number) => {
@@ -407,7 +396,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   map.remove();
-  // ✅ Optional: Tauri wieder entfernen
   delete (window as any).__tauriInvoke;
   delete (window as any).__requestRoute;
 });
