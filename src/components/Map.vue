@@ -233,25 +233,32 @@ function addBikeLines(routes: SkiArea[]) {
   routes.forEach((r) => {
     if (!r.geometry || r.geometry.length < 2) return;
 
-    // 1. Weiße Umrandung (Casing)
+    // 1. Schwarze Basislinie
     L.polyline(r.geometry as L.LatLngExpression[], {
-      color: "#ffffff",
-      weight: 7,
-      opacity: 0.85,
+      color: "#000000",
+      weight: 6,
+      opacity: 0.9,
       lineCap: "round",
       lineJoin: "round",
     }).addTo(bikeLayer);
 
-    // 2. Grüne Linie darüber – klickbar → Popup mit Route-Button
+    // 2. Gelbe gestrichelte Linie darüber → gelb-schwarz
+    const difficulty = r.difficulty?.toLowerCase();
+    const diffText =
+      difficulty && difficulty !== "unbekannt" && difficulty !== "unknown"
+        ? r.difficulty
+        : "Bike-Route 🚲";
+
     L.polyline(r.geometry as L.LatLngExpression[], {
-      color: "#16a34a",
-      weight: 3.5,
+      color: "#facc15",
+      weight: 2.5,
       opacity: 0.95,
+      dashArray: "8 8",
       lineCap: "round",
       lineJoin: "round",
     })
       .addTo(bikeLayer)
-      .bindPopup(buildPopupHtml(r, "#16a34a", r.difficulty || "Bike-Route 🚲"));
+      .bindPopup(buildPopupHtml(r, "#facc15", diffText));
   });
 }
 

@@ -56,10 +56,23 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
                 if let Some(elements) = json.get("elements").and_then(|e| e.as_array()) {
                     for el in elements {
                         let tags = el.get("tags").unwrap_or(&Value::Null);
+
+                        let is_bike = tags.get("mtb:scale").is_some()
+                            || tags
+                                .get("bicycle")
+                                .and_then(|v| v.as_str())
+                                .map(|v| v == "designated")
+                                .unwrap_or(false);
+
+                        let default_name = if is_bike {
+                            "Unbenannte Bike Strecke"
+                        } else {
+                            "Unbekannte Piste"
+                        };
                         let name = tags
                             .get("name")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("Unbenanntes Skigebiet")
+                            .unwrap_or(default_name)
                             .to_string();
 
                         let mut lat = el
@@ -100,12 +113,7 @@ async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
                             lon = mid[1];
                         }
 
-                        let is_bike = tags.get("mtb:scale").is_some()
-                            || tags
-                                .get("bicycle")
-                                .and_then(|v| v.as_str())
-                                .map(|v| v == "designated")
-                                .unwrap_or(false);
+                        // ❌ HIER WAR FRÜHER die is_bike-Berechnung – jetzt gelöscht
 
                         if lat != 0.0 && lon != 0.0 {
                             ski_areas.push(SkiArea {
@@ -253,7 +261,7 @@ pub async fn fetch_route(
         .collect();
 
     println!(
-        "🗺️ Route fertig: {} Punkte | erster: {:?} | letzter: {:?}",
+        "Route fertig: {} Punkte | erster: {:?} | letzter: {:?}",
         route.len(),
         route.first(),
         route.last()

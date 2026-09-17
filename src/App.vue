@@ -16,7 +16,7 @@ import {
   AlertCircle,
   ChevronRight,
   Ruler,
-  Bike, // ✅ NEU
+  Bike,
 } from "lucide-vue-next";
 import {
   Sheet,

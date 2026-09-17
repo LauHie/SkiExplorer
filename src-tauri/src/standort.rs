@@ -16,7 +16,6 @@ pub struct Standort {
 pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String> {
     let client = Client::new();
 
-    // ✅ URL manuell bauen (wie in ski_area.rs) – Leerzeichen/Kommas encodieren
     let q = query_string.trim().replace(' ', "%20").replace(',', "%2C");
     let url = format!(
         "https://nominatim.openstreetmap.org/search?q={}&format=json&limit=10",
@@ -25,7 +24,7 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
 
     let res = client
         .get(&url)
-        .header("User-Agent", "ski-explorer-app") // ⚠️ Pflicht!
+        .header("User-Agent", "ski-explorer-app")
         .send()
         .await
         .map_err(|e| format!("HTTP error: {}", e))?;
@@ -66,9 +65,6 @@ pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String>
                 .unwrap_or("Unbekannt")
                 .to_string();
 
-            // ✅ boundingbox ist ein JSON-Array von Strings (kein String!)
-            // Nominatim-Order: [south, north, west, east] = [minLat, maxLat, minLon, maxLon]
-            // → passt genau zur erwarteten Reihenfolge im Frontend
             let boundary = el
                 .get("boundingbox")
                 .and_then(|v| v.as_array())
