@@ -19,7 +19,10 @@ pub struct SkiArea {
 async fn fetch_overpass(query: String) -> Result<Vec<SkiArea>, String> {
     let url = format!("https://overpass-api.de/api/interpreter?{}", query);
 
-    let client = Client::new();
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| format!("Failed to build client: {}", e))?;
     let mut last_err = None;
 
     for attempt in 1..=3 {
@@ -189,7 +192,10 @@ pub async fn fetch_route(
 
     println!("🌐 Routing-URL: {}", url);
 
-    let client = Client::new();
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| format!("Failed to build client: {}", e))?;
     let res = match client
         .get(&url)
         .header("User-Agent", "ski-explorer-app (your@email.com)")

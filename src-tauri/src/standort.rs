@@ -14,7 +14,10 @@ pub struct Standort {
 
 #[tauri::command]
 pub async fn get_standort(query_string: String) -> Result<Vec<Standort>, String> {
-    let client = Client::new();
+    let client = Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| format!("Failed to build client: {}", e))?;
 
     let q = query_string.trim().replace(' ', "%20").replace(',', "%2C");
     let url = format!(
